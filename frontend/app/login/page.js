@@ -1,19 +1,17 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import { useAuth, USER_TYPES } from "../../context/authContext";
 import { useRouter } from "next/navigation";
-import { useAuth, USER_TYPES } from "@/context/authContext";
 
-export default function CustomerSignup() {
+export default function Login() {
   const { login } = useAuth();
   const router = useRouter();
   const [formData, setFormData] = useState({
-    name: "",
     email: "",
     password: "",
-    confirmPassword: "",
-    phoneNumber: "",
   });
+  const [error, setError] = useState("");
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -26,20 +24,24 @@ export default function CustomerSignup() {
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Validate password match
-    if (formData.password !== formData.confirmPassword) {
-      alert("Passwords don't match");
-      return;
+    // In a real app, you would validate credentials with your backend
+    // For this demo, we'll simulate a successful login
+    try {
+      // Simulate successful login
+      const userData = {
+        id: '123',
+        name: formData.email.split('@')[0], // Just use the username part of email as name
+        email: formData.email,
+      };
+      
+      // Assume it's a customer for now - in a real app you'd determine this from backend
+      login(userData, USER_TYPES.CUSTOMER);
+      
+      // Redirect to home page initially, later we can change this to dashboard
+      router.push('/');
+    } catch (err) {
+      setError("Invalid login credentials");
     }
-    
-    // In a real app, you would send this data to your backend
-    console.log("Customer form submitted:", formData);
-    
-    // Use the auth context to log the user in
-    login(formData, USER_TYPES.CUSTOMER);
-    
-    // Redirect to home page using the router
-    router.push('/');
   };
 
   const inputClass = "mt-1 block w-full bg-gray-800 border border-gray-700 rounded py-2 px-3 text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500";
@@ -55,30 +57,20 @@ export default function CustomerSignup() {
             </Link>
             <div className="w-16 h-1 bg-blue-500 mx-auto my-4"></div>
             <h2 className="text-3xl font-bold text-white">
-              Customer Sign Up
+              Sign In
             </h2>
             <p className="mt-2 text-sm text-gray-400">
-              Join us to discover great food deals in Chicago
+              Access your account to manage your food orders
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="name" className={labelClass}>
-                Full Name
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                required
-                className={inputClass}
-                value={formData.name}
-                onChange={handleChange}
-                placeholder="John Doe"
-              />
+          {error && (
+            <div className="mb-4 p-3 bg-red-900/30 border border-red-800 rounded text-red-200 text-sm">
+              {error}
             </div>
+          )}
 
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="email" className={labelClass}>
                 Email Address
@@ -92,22 +84,6 @@ export default function CustomerSignup() {
                 value={formData.email}
                 onChange={handleChange}
                 placeholder="you@example.com"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="phoneNumber" className={labelClass}>
-                Phone Number
-              </label>
-              <input
-                id="phoneNumber"
-                name="phoneNumber"
-                type="tel"
-                required
-                className={inputClass}
-                value={formData.phoneNumber}
-                onChange={handleChange}
-                placeholder="(312) 555-1234"
               />
             </div>
 
@@ -127,46 +103,41 @@ export default function CustomerSignup() {
               />
             </div>
 
-            <div>
-              <label htmlFor="confirmPassword" className={labelClass}>
-                Confirm Password
-              </label>
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                required
-                className={inputClass}
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                placeholder="••••••••"
-              />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <input
+                  id="remember_me"
+                  name="remember_me"
+                  type="checkbox"
+                  className="h-4 w-4 bg-gray-800 border-gray-700 text-blue-600 focus:ring-blue-500"
+                />
+                <label htmlFor="remember_me" className="ml-2 block text-sm text-gray-400">
+                  Remember me
+                </label>
+              </div>
+              <a href="#" className="text-sm text-blue-400 hover:text-blue-300">
+                Forgot password?
+              </a>
             </div>
 
-            <div className="flex items-center justify-between pt-4">
-              <Link
-                href="/signup"
-                className="text-gray-400 hover:text-blue-400 transition-colors"
-              >
-                Back
-              </Link>
+            <div>
               <button
                 type="submit"
-                className="bg-blue-600 text-white py-2 px-6 border border-blue-500 rounded text-sm font-medium hover:bg-blue-700 transition-colors"
+                className="w-full bg-blue-600 text-white py-2 px-4 border border-blue-500 rounded text-sm font-medium hover:bg-blue-700 transition-colors"
               >
-                Create Account
+                Sign In
               </button>
             </div>
           </form>
 
           <div className="mt-8 pt-6 border-t border-gray-700 text-center">
             <p className="text-sm text-gray-400">
-              Already have an account?{" "}
+              Don't have an account?{" "}
               <Link
-                href="/login"
+                href="/signup"
                 className="font-medium text-blue-400 hover:text-blue-300 transition-colors"
               >
-                Sign in
+                Sign up
               </Link>
             </p>
           </div>

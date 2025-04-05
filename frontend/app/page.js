@@ -2,8 +2,6 @@
 import { useAuth, USER_TYPES } from '@/context/authContext';
 import LandingPage from './components/LandingPage';
 import CustomerDashboard from './components/CustomerDashboard';
-import Navbar from './components/Navbar';
-import Footer from './components/Footer';
 
 export default function Home() {
   const { isAuthenticated, isCustomer, isBusiness } = useAuth();

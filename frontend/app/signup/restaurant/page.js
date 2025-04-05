@@ -3,6 +3,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth, USER_TYPES } from "@/context/authContext";
+import { supabase } from "@/lib/supabase";
+import bcrypt from 'bcryptjs';
 
 export default function RestaurantSignup() {
   const { login } = useAuth();
@@ -16,6 +18,8 @@ export default function RestaurantSignup() {
     address: "",
     phoneNumber: "",
   });
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -25,23 +29,59 @@ export default function RestaurantSignup() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-
+    setError("");
+    setIsLoading(true);
+    
     // Validate password match
     if (formData.password !== formData.confirmPassword) {
-      alert("Passwords don't match");
+      setError("Passwords don't match");
+      setIsLoading(false);
       return;
     }
-
-    // In a real app, you would send this data to your backend
-    console.log("Restaurant form submitted:", formData);
-
-    // Use the auth context to log the user in as a business
-    login(formData, USER_TYPES.BUSINESS);
-
-    // Redirect to home page
-    router.push("/");
+    
+    try {
+      // Hash the password
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(formData.password, salt);
+      
+      // Insert user data into Supabase
+      const { data, error } = await supabase
+        .from('users')
+        .insert([
+          { 
+            name: formData.name,
+            email: formData.email,
+            password_hash: hashedPassword,
+            is_restaurant: true,
+            lat: null, // These can be updated when geocoding the address
+            lng: null,
+            created_at: new Date()
+          }
+        ])
+        .select();
+      
+      if (error) throw error;
+      
+      if (data && data[0]) {
+        // Use the auth context to log the user in
+        login({
+          id: data[0].id,
+          name: data[0].name,
+          email: data[0].email,
+          businessName: formData.businessName
+        }, USER_TYPES.BUSINESS);
+        
+        // Redirect to home page
+        router.push('/');
+      }
+    } catch (err) {
+      console.error('Error creating restaurant account:', err);
+      setError(err.message || "Failed to create account. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const inputClass =

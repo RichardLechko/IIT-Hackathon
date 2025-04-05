@@ -3,6 +3,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth, USER_TYPES } from "@/context/authContext";
+import { supabase } from "@/lib/supabase";
+import bcrypt from 'bcryptjs';
 
 export default function CustomerSignup() {
   const { login } = useAuth();
@@ -14,6 +16,8 @@ export default function CustomerSignup() {
     confirmPassword: "",
     phoneNumber: "",
   });
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -23,23 +27,58 @@ export default function CustomerSignup() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    setIsLoading(true);
     
     // Validate password match
     if (formData.password !== formData.confirmPassword) {
-      alert("Passwords don't match");
+      setError("Passwords don't match");
+      setIsLoading(false);
       return;
     }
     
-    // In a real app, you would send this data to your backend
-    console.log("Customer form submitted:", formData);
-    
-    // Use the auth context to log the user in
-    login(formData, USER_TYPES.CUSTOMER);
-    
-    // Redirect to home page using the router
-    router.push('/');
+    try {
+      // Hash the password
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(formData.password, salt);
+      
+      // Insert user data into Supabase
+      const { data, error } = await supabase
+        .from('users')
+        .insert([
+          { 
+            name: formData.name,
+            email: formData.email,
+            password_hash: hashedPassword,
+            is_restaurant: false,
+            lat: null, // These can be updated later when location is determined
+            lng: null,
+            created_at: new Date()
+          }
+        ])
+        .select();
+      
+      if (error) throw error;
+      
+      if (data && data[0]) {
+        // Use the auth context to log the user in
+        login({
+          id: data[0].id,
+          name: data[0].name,
+          email: data[0].email
+        }, USER_TYPES.CUSTOMER);
+        
+        // Redirect to home page
+        router.push('/');
+      }
+    } catch (err) {
+      console.error('Error creating customer account:', err);
+      setError(err.message || "Failed to create account. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const inputClass = "mt-1 block w-full bg-gray-800 border border-gray-700 rounded py-2 px-3 text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500";

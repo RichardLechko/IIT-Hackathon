@@ -37,36 +37,37 @@ export default function Signup() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden md:max-w-2xl">
+    <div className="min-h-screen bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md mx-auto bg-gray-800 rounded border-2 border-gray-700 overflow-hidden md:max-w-2xl">
         <div className="p-8">
           <div className="text-center mb-6">
-            <Link href="/" className="text-2xl font-bold text-emerald-600">
+            <Link href="/" className="text-2xl font-bold text-white">
               NowOrNever
             </Link>
-            <h2 className="mt-4 text-3xl font-extrabold text-gray-900">
+            <div className="w-16 h-1 bg-blue-500 mx-auto my-4"></div>
+            <h2 className="text-3xl font-bold text-white">
               Create an Account
             </h2>
-            <p className="mt-2 text-sm text-gray-600">
+            <p className="mt-2 text-sm text-gray-400">
               Join the movement to reduce food waste in Chicago
             </p>
           </div>
 
           <div>
-            <p className="text-center mb-6 text-gray-700">
+            <p className="text-center mb-6 text-gray-300">
               Choose account type:
             </p>
             <div className="grid grid-cols-2 gap-4">
               <Link
                 href="/signup/restaurant"
-                className="flex flex-col items-center justify-center p-6 border-2 rounded-lg hover:border-emerald-500 hover:bg-emerald-50 transition-colors"
+                className="flex flex-col items-center justify-center p-6 border-2 border-gray-700 rounded hover:border-blue-500 bg-gray-800 hover:bg-gray-700 transition-colors"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
-                  className="h-10 w-10 text-emerald-600 mb-3"
+                  className="h-10 w-10 text-blue-400 mb-3"
                 >
                   <path
                     strokeLinecap="round"
@@ -75,23 +76,23 @@ export default function Signup() {
                     d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
                   />
                 </svg>
-                <span className="font-medium text-gray-900">
+                <span className="font-medium text-white">
                   Restaurant / Business
                 </span>
-                <span className="text-sm text-gray-500 mt-1">
+                <span className="text-sm text-gray-400 mt-1">
                   I want to reduce food waste
                 </span>
               </Link>
               <Link
                 href="/signup/customer"
-                className="flex flex-col items-center justify-center p-6 border-2 rounded-lg hover:border-emerald-500 hover:bg-emerald-50 transition-colors"
+                className="flex flex-col items-center justify-center p-6 border-2 border-gray-700 rounded hover:border-blue-500 bg-gray-800 hover:bg-gray-700 transition-colors"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
-                  className="h-10 w-10 text-emerald-600 mb-3"
+                  className="h-10 w-10 text-blue-400 mb-3"
                 >
                   <path
                     strokeLinecap="round"
@@ -100,20 +101,20 @@ export default function Signup() {
                     d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
                   />
                 </svg>
-                <span className="font-medium text-gray-900">Customer</span>
-                <span className="text-sm text-gray-500 mt-1">
+                <span className="font-medium text-white">Customer</span>
+                <span className="text-sm text-gray-400 mt-1">
                   I want to discover deals
                 </span>
               </Link>
             </div>
           </div>
 
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
+          <div className="mt-8 pt-6 border-t border-gray-700 text-center">
+            <p className="text-sm text-gray-400">
               Already have an account?{" "}
               <Link
                 href="/login"
-                className="font-medium text-emerald-600 hover:text-emerald-500"
+                className="font-medium text-blue-400 hover:text-blue-300 transition-colors"
               >
                 Sign in
               </Link>

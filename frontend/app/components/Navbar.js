@@ -4,7 +4,7 @@ import { useAuth, USER_TYPES } from "@/context/authContext";
 import { useRouter } from "next/navigation";
 
 export default function Navbar() {
-  const { user, userType, isAuthenticated, isCustomer, logout } = useAuth();
+  const { user, userType, isAuthenticated, isCustomer, isBusiness, logout } = useAuth();
   const router = useRouter();
 
   // Links for guest users
@@ -24,9 +24,18 @@ export default function Navbar() {
     { href: "/donate", label: "Donate" },
   ];
 
+  // Links for signed-in restaurants/businesses
+  const businessLinks = [
+    { href: "/", label: "Dashboard" },
+    { href: "/deals", label: "Manage Deals" },
+    { href: "/analytics", label: "Analytics" },
+  ];
+
   // Determine which links to show based on authentication state
-  const navLinks =
-    isAuthenticated() && isCustomer() ? customerLinks : guestLinks;
+  const navLinks = 
+    isAuthenticated() && isCustomer() ? customerLinks :
+    isAuthenticated() && isBusiness() ? businessLinks :
+    guestLinks;
 
   const NavLink = ({ href, label }) => {
     // For hash links on the landing page
@@ -73,7 +82,7 @@ export default function Navbar() {
               <NavLink key={link.href} href={link.href} label={link.label} />
             ))}
 
-            {isAuthenticated() && isCustomer() ? (
+            {isAuthenticated() ? (
               <div className="flex items-center space-x-4">
                 <span className="text-gray-300 px-3 py-2 text-sm">
                   Hi, {user.name}

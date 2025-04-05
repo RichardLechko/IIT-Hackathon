@@ -63,6 +63,7 @@ export default function RestaurantHome() {
         pickup_end: new Date(newDeal.pickup_end).toISOString(),
         original_price: parseFloat(newDeal.original_price),
         claimed: false,
+        restaurant_id: user.id,
         // Remove any id field if it exists
         // Let Supabase handle the id generation
       };

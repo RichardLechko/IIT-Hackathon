@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth, USER_TYPES } from "@/context/authContext";
@@ -15,9 +15,13 @@ export default function CustomerSignup() {
     password: "",
     confirmPassword: "",
     phoneNumber: "",
+    address: "",
   });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [useCurrentLocation, setUseCurrentLocation] = useState(false);
+  const [coordinates, setCoordinates] = useState({ lat: null, lng: null });
+  const [locationStatus, setLocationStatus] = useState("");
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -25,6 +29,68 @@ export default function CustomerSignup() {
       ...prev,
       [name]: value,
     }));
+  };
+
+  // Handle location checkbox change
+  const handleLocationCheckbox = (e) => {
+    const isChecked = e.target.checked;
+    setUseCurrentLocation(isChecked);
+    
+    if (isChecked) {
+      getCurrentLocation();
+    } else {
+      // Clear the address field if user unchecks the box
+      setFormData(prev => ({ ...prev, address: "" }));
+      setCoordinates({ lat: null, lng: null });
+      setLocationStatus("");
+    }
+  };
+
+  // Get current location
+  const getCurrentLocation = () => {
+    setLocationStatus("Requesting location...");
+    
+    if (!navigator.geolocation) {
+      setLocationStatus("Geolocation is not supported by your browser");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        setCoordinates({ lat: latitude, lng: longitude });
+        
+        // Attempt to reverse geocode to get address
+        try {
+          // This is a simple example using a free geocoding API
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
+          );
+          const data = await response.json();
+          
+          if (data && data.display_name) {
+            setFormData(prev => ({ ...prev, address: data.display_name }));
+            setLocationStatus("Location found");
+          } else {
+            setLocationStatus("Location found, but couldn't get address");
+          }
+        } catch (error) {
+          console.error("Error getting address:", error);
+          setLocationStatus("Location coordinates captured (address lookup failed)");
+          // Just use the coordinates without address
+        }
+      },
+      (error) => {
+        console.error("Error getting location:", error);
+        setLocationStatus(
+          error.code === 1
+            ? "Location permission denied"
+            : "Error getting location"
+        );
+        setUseCurrentLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
   };
 
   const handleSubmit = async (e) => {
@@ -53,8 +119,8 @@ export default function CustomerSignup() {
             email: formData.email,
             password_hash: hashedPassword,
             is_restaurant: false,
-            lat: null, // These can be updated later when location is determined
-            lng: null,
+            lat: coordinates.lat, 
+            lng: coordinates.lng,
             created_at: new Date()
           }
         ])
@@ -100,6 +166,12 @@ export default function CustomerSignup() {
               Join us to discover great food deals in Chicago
             </p>
           </div>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-900/30 border border-red-800 rounded text-red-200 text-sm">
+              {error}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
@@ -151,6 +223,44 @@ export default function CustomerSignup() {
             </div>
 
             <div>
+              <label htmlFor="address" className={labelClass}>
+                Address (for finding nearby deals)
+              </label>
+              <input
+                id="address"
+                name="address"
+                type="text"
+                className={inputClass}
+                value={formData.address}
+                onChange={handleChange}
+                placeholder="123 Main St, Chicago, IL"
+                disabled={useCurrentLocation}
+              />
+              <div className="mt-2 flex items-center">
+                <input
+                  id="useCurrentLocation"
+                  name="useCurrentLocation"
+                  type="checkbox"
+                  checked={useCurrentLocation}
+                  onChange={handleLocationCheckbox}
+                  className="h-4 w-4 bg-gray-800 border-gray-700 text-blue-600 focus:ring-blue-500 rounded"
+                />
+                <label htmlFor="useCurrentLocation" className="ml-2 text-sm text-gray-400">
+                  Use current location
+                </label>
+              </div>
+              {locationStatus && (
+                <p className={`mt-1 text-xs ${
+                  locationStatus.includes("error") || locationStatus.includes("denied") 
+                    ? "text-red-400" 
+                    : "text-blue-400"
+                }`}>
+                  {locationStatus}
+                </p>
+              )}
+            </div>
+
+            <div>
               <label htmlFor="password" className={labelClass}>
                 Password
               </label>
@@ -191,9 +301,10 @@ export default function CustomerSignup() {
               </Link>
               <button
                 type="submit"
-                className="bg-blue-600 text-white py-2 px-6 border border-blue-500 rounded text-sm font-medium hover:bg-blue-700 transition-colors"
+                disabled={isLoading}
+                className="bg-blue-600 text-white py-2 px-6 border border-blue-500 rounded text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Create Account
+                {isLoading ? "Creating Account..." : "Create Account"}
               </button>
             </div>
           </form>

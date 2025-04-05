@@ -2,59 +2,54 @@
 import { useState } from "react";
 import { useAuth } from "@/context/authContext";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { supabase } from "@/lib/supabase"; 
 
 export default function CustomerDashboard() {
   const { user } = useAuth();
   const router = useRouter();
   const [location, setLocation] = useState("Chicago Loop");
   
-  // Sample data for food deals
-  const deals = [
-    {
-      id: 1,
-      restaurantName: "Pasta Palace",
-      description: "Handmade pasta with signature sauces - takeout only",
-      originalPrice: 16.99,
-      discountedPrice: 6.99,
-      imageUrl: "/pasta.jpg",
-      closingTime: "8:00 PM",
-      distance: "0.3 miles",
-      tags: ["Italian", "Pasta"]
-    },
-    {
-      id: 2,
-      restaurantName: "Green Garden",
-      description: "Farm-to-table vegetarian bowls and smoothies",
-      originalPrice: 12.99,
-      discountedPrice: 5.50,
-      imageUrl: "/salad.jpg",
-      closingTime: "9:30 PM",
-      distance: "0.8 miles",
-      tags: ["Vegetarian", "Healthy"]
-    },
-    {
-      id: 3,
-      restaurantName: "Taco Fiesta",
-      description: "Authentic street tacos and fresh salsa",
-      originalPrice: 14.99,
-      discountedPrice: 7.25,
-      imageUrl: "/tacos.jpg",
-      closingTime: "10:00 PM",
-      distance: "1.2 miles",
-      tags: ["Mexican", "Spicy"]
-    },
-    {
-      id: 4,
-      restaurantName: "Burger Barn",
-      description: "Gourmet burgers with house-made pickles",
-      originalPrice: 15.99,
-      discountedPrice: 8.99,
-      imageUrl: "/burger.jpg", 
-      closingTime: "9:00 PM",
-      distance: "0.5 miles",
-      tags: ["American", "Burgers"]
-    }
-  ];
+  const [deals, setDeals] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDealsWithRestaurants = async () => {
+      const { data: dealsData, error: dealsError } = await supabase
+        .from("deals")
+        .select("*, restaurant_id")
+        .order("created_at", { ascending: false })
+        .limit(4);
+  
+      if (dealsError) {
+        console.error("Error fetching deals:", dealsError.message);
+        return;
+      }
+  
+      const dealsWithRestaurantNames = await Promise.all(
+        dealsData.map(async (deal) => {
+          const { data: userData, error: userError } = await supabase
+            .from("users")
+            .select("name")
+            .eq("id", deal.restaurant_id)
+            .eq("is_restaurant", true)
+            .single();
+  
+          return {
+            ...deal,
+            restaurantName: userData?.name || "Unknown Restaurant"
+          };
+        })
+      );
+  
+      setDeals(dealsWithRestaurantNames);
+      setLoading(false);
+    };
+  
+    fetchDealsWithRestaurants();
+  }, []);
+  
+
   
   // Saved deals for the user
   const savedDeals = [
@@ -77,23 +72,34 @@ export default function CustomerDashboard() {
       </div>
       <div className="p-6">
         <div className="flex justify-between items-start mb-2">
-          <h3 className="text-white text-xl font-semibold">{deal.restaurantName}</h3>
+          <h3 className="text-white text-xl font-semibold">
+            {deal.restaurantName}
+          </h3>
           <span className="bg-blue-900 text-blue-300 text-xs px-2 py-1 rounded">
-            {calculateDiscount(deal.originalPrice, deal.discountedPrice)}% OFF
+            {calculateDiscount(deal.original_price, deal.updated_price)}% OFF
           </span>
         </div>
-        <p className="text-gray-400 mb-4">{deal.description}</p>
+  
+        <p className="text-gray-400 mb-4">{deal.title}</p>
+  
         <div className="flex items-center text-sm text-gray-500 mb-4">
-          <span className="mr-4">Closes at {deal.closingTime}</span>
-          <span>{deal.distance}</span>
+          <span className="mr-4">
+            Closes at {new Date(deal.pickup_end).toLocaleTimeString()}
+          </span>
+          <span>{deal.lat}, {deal.lng}</span>
         </div>
+  
         <div className="flex justify-between items-center">
           <div>
-            <span className="text-gray-400 line-through mr-2">${deal.originalPrice.toFixed(2)}</span>
-            <span className="text-blue-400 font-bold">${deal.discountedPrice.toFixed(2)}</span>
+            <span className="text-gray-400 line-through mr-2">
+              ${deal.original_price?.toFixed(2)}
+            </span>
+            <span className="text-blue-400 font-bold">
+              ${deal.updated_price?.toFixed(2)}
+            </span>
           </div>
-          <button 
-            onClick={() => handleViewDeal(deal.id)} 
+          <button
+            onClick={() => handleViewDeal(deal.id)}
             className="bg-blue-600 text-white px-4 py-2 rounded border border-blue-500 hover:bg-blue-700 transition-colors"
           >
             View Deal
@@ -102,6 +108,8 @@ export default function CustomerDashboard() {
       </div>
     </div>
   );
+  
+  
   
   // Component for activity item
   const ActivityItem = ({ deal }) => (
@@ -119,14 +127,14 @@ export default function CustomerDashboard() {
   
   // Function to calculate discount percentage
   const calculateDiscount = (original, discounted) => {
+    if (!original || !discounted) return 0;
     return Math.round(((original - discounted) / original) * 100);
   };
   
+  
   // Function to handle viewing a deal
   const handleViewDeal = (dealId) => {
-    console.log(`Viewing deal ${dealId}`);
-    // In a real app, this would navigate to the deal details page
-    // router.push(`/deals/${dealId}`);
+    router.push(`/deals/${dealId}`);
   };
   
   // Function to handle browsing all deals
@@ -147,21 +155,7 @@ export default function CustomerDashboard() {
         <h1 className="text-3xl font-bold text-white mb-2">Welcome, {user?.name}</h1>
         <div className="w-16 h-1 bg-blue-500 mb-8"></div>
         
-        {/* Location selector */}
-        <div className="mb-8 flex items-center">
-          <span className="text-gray-400 mr-3">Your location:</span>
-          <select 
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            className="bg-gray-800 border border-gray-700 text-white rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          >
-            <option>Chicago Loop</option>
-            <option>Wicker Park</option>
-            <option>Logan Square</option>
-            <option>Lincoln Park</option>
-            <option>West Loop</option>
-          </select>
-        </div>
+      
         
         {/* Quick actions */}
         <div className="grid grid-cols-2 gap-8 mb-12">

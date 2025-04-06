@@ -19,7 +19,6 @@ export default function Navbar() {
   const guestLinks = [
     { href: isLandingPage ? "#how-it-works" : "/#how-it-works", label: "How It Works" },
     { href: isLandingPage ? "#for-businesses" : "/#for-businesses", label: "For Businesses" },
-    { href: isLandingPage ? "#for-shelters" : "/#for-shelters", label: "For Shelters" },
     { href: "/leaderboard", label: "Leaderboard" },
     { href: "/login", label: "Login" },
   ];

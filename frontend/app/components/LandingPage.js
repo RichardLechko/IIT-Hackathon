@@ -316,65 +316,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Chicago Map Section */}
-      <section
-        className="py-24 bg-gray-800 border-b border-gray-700"
-        id="for-shelters"
-      >
-        <div className="max-w-7xl mx-auto px-8">
-          <div className="flex items-center">
-            <div className="w-1/2">
-              <h2 className="text-3xl font-bold text-white mb-2">
-                Serving All Chicago Neighborhoods
-              </h2>
-              <div className="w-16 h-1 bg-blue-500 mb-6"></div>
-              <p className="text-lg text-gray-400 mb-8">
-                NowOrNever is available throughout Chicago, connecting local
-                businesses with customers and shelters to reduce food waste
-                city-wide.
-              </p>
-              <div className="bg-gray-900 p-6 rounded border-2 border-gray-700">
-                <p className="text-white font-bold mb-4">Most Active Areas:</p>
-                <ul className="grid grid-cols-2 gap-y-4 gap-x-6">
-                  <li className="text-gray-300 font-medium flex items-center">
-                    <div className="h-3 w-3 bg-blue-500 rounded-full mr-3"></div>
-                    Loop
-                  </li>
-                  <li className="text-gray-300 font-medium flex items-center">
-                    <div className="h-3 w-3 bg-blue-500 rounded-full mr-3"></div>
-                    Wicker Park
-                  </li>
-                  <li className="text-gray-300 font-medium flex items-center">
-                    <div className="h-3 w-3 bg-blue-500 rounded-full mr-3"></div>
-                    Logan Square
-                  </li>
-                  <li className="text-gray-300 font-medium flex items-center">
-                    <div className="h-3 w-3 bg-blue-500 rounded-full mr-3"></div>
-                    Lincoln Park
-                  </li>
-                  <li className="text-gray-300 font-medium flex items-center">
-                    <div className="h-3 w-3 bg-blue-500 rounded-full mr-3"></div>
-                    West Loop
-                  </li>
-                  <li className="text-gray-300 font-medium flex items-center">
-                    <div className="h-3 w-3 bg-blue-500 rounded-full mr-3"></div>
-                    Hyde Park
-                  </li>
-                </ul>
-              </div>
-            </div>
-            <div className="w-1/2 flex justify-center">
-              <div className="w-full max-w-md h-80 rounded border-2 border-gray-700 overflow-hidden">
-                <div className="w-full h-full bg-gray-800 flex items-center justify-center">
-                  <p className="text-gray-400 font-medium">
-                    Chicago Map Preview
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      
+         
 
       {/* Call To Action */}
       <section className="py-24 bg-gray-800 border-t border-gray-700" id="cta-section">

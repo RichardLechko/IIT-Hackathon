@@ -12,6 +12,7 @@ export default function Navbar() {
     { href: "#how-it-works", label: "How It Works" },
     { href: "#for-businesses", label: "For Businesses" },
     { href: "#for-shelters", label: "For Shelters" },
+    { href: "/leaderboard", label: "Leaderboard" },
     { href: "/login", label: "Login" },
   ];
 
@@ -22,6 +23,7 @@ export default function Navbar() {
     { href: "/saved", label: "Saved Items" },
     { href: "/orders", label: "My Orders" },
     { href: "/donate", label: "Donate" },
+    { href: "/leaderboard", label: "Leaderboard" },
   ];
 
   // Links for signed-in restaurants/businesses
@@ -29,6 +31,7 @@ export default function Navbar() {
     { href: "/", label: "Dashboard" },
     { href: "/deals", label: "Manage Deals" },
     { href: "/analytics", label: "Analytics" },
+    { href: "/leaderboard", label: "Leaderboard" },
   ];
 
   // Determine which links to show based on authentication state

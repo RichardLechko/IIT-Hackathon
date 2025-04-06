@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/authContext";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
 export default function MyOrdersPage() {
@@ -24,9 +24,11 @@ export default function MyOrdersPage() {
       }
 
       try {
+        const supabase = getSupabase();
+
         const { data, error } = await supabase
           .from("claims")
-          .select("*, deals(*, users(name))")
+          .select("*, deals(*, users!inner(name))")
           .eq("customer_id", user.id)
           .order("claimed_at", { ascending: false });
 
@@ -45,6 +47,14 @@ export default function MyOrdersPage() {
 
     fetchOrders();
   }, [user]);
+
+  if (!user) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        Please log in to view your orders.
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -73,13 +83,13 @@ export default function MyOrdersPage() {
           {orders.map(({ id, claimed_at, deals }) => (
             <div 
               key={id} 
-              className="border rounded-lg p-4 shadow-md"
+              className="border rounded-lg p-4 shadow-md bg-gray-800 border-gray-700"
             >
-              <h2 className="text-xl font-semibold">{deals.title}</h2>
-              <p className="text-gray-600">
+              <h2 className="text-xl font-semibold text-white">{deals.title}</h2>
+              <p className="text-gray-400">
                 {deals.users?.name || "Unknown Restaurant"}
               </p>
-              <p className="mb-2">{deals.description}</p>
+              <p className="mb-2 text-gray-300">{deals.description}</p>
               
               <div className="text-sm text-gray-500 mb-2">
                 <p>Claimed: {new Date(claimed_at).toLocaleString()}</p>
@@ -91,7 +101,7 @@ export default function MyOrdersPage() {
               </div>
               
               <div className="flex justify-between items-center">
-                <span className="font-bold text-lg">
+                <span className="font-bold text-lg text-blue-400">
                   ${deals.updated_price?.toFixed(2)}
                 </span>
                 <button

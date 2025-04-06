@@ -4,6 +4,13 @@ import { useAuth } from "@/context/authContext";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { v4 as uuidv4 } from 'uuid';
+import Anthropic from "@anthropic-ai/sdk";
+
+// Initialize Anthropic - this would typically use environment variables
+const anthropic = new Anthropic({
+  apiKey: process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY,
+  dangerouslyAllowBrowser: true 
+});
 
 export default function RestaurantHome() {
   const { user, isBusiness, logout } = useAuth();
@@ -20,6 +27,8 @@ export default function RestaurantHome() {
   const [isLoading, setIsLoading] = useState(false);
   const [dealImages, setDealImages] = useState([]);
   const [imagePreview, setImagePreview] = useState([]);
+  const [foodInspection, setFoodInspection] = useState(null);
+  const [inspectionLoading, setInspectionLoading] = useState(false);
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
 
@@ -55,8 +64,76 @@ export default function RestaurantHome() {
     return date.toISOString().slice(0, 16); // Format: YYYY-MM-DDThh:mm
   };
 
-  const handleFileChange = (e) => {
-    const files = Array.from(e.target.files);
+  // Function to analyze food images with our API route
+  const analyzeFoodImage = async () => {
+    // Use imagePreview length as a more reliable indicator
+    if (imagePreview.length === 0) {
+      setFoodInspection("No images to analyze.");
+      return;
+    }
+
+    setInspectionLoading(true);
+    setFoodInspection(null);
+    
+    try {
+      // Get the current dealImages - make a local reference to avoid closure issues
+      const currentImages = [...dealImages];
+      
+      // Convert all images to base64
+      const imagePromises = currentImages.map(async (file) => {
+        const base64Image = await fileToBase64(file);
+        return {
+          imageData: base64Image.split(',')[1],
+          mediaType: file.type
+        };
+      });
+      
+      const images = await Promise.all(imagePromises);
+      
+      // Call our API endpoint with all images
+      const response = await fetch('/api/analyze-food', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ images }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to analyze images');
+      }
+      
+      const data = await response.json();
+      setFoodInspection(data.result);
+    } catch (error) {
+      console.error("Error analyzing food images:", error);
+      setFoodInspection(`Error: ${error.message}`);
+    } finally {
+      setInspectionLoading(false);
+    }
+  };
+
+  // Modify the fileToBase64 function to be more robust
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      if (!file) {
+        reject(new Error("File is undefined"));
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  // Update handleFileChange to not auto-analyze
+  const handleFileChange = async (e) => {
+    const files = Array.from(e.target.files || []);
+    
+    if (files.length === 0) return;
     
     // Add new files to the state
     setDealImages(prevImages => [...prevImages, ...files]);
@@ -64,6 +141,8 @@ export default function RestaurantHome() {
     // Generate preview URLs
     const newPreviews = files.map(file => URL.createObjectURL(file));
     setImagePreview(prevPreviews => [...prevPreviews, ...newPreviews]);
+    
+    // Don't auto-analyze - let user click the button
   };
 
   const handleTakePhoto = () => {
@@ -73,12 +152,24 @@ export default function RestaurantHome() {
   };
 
   const removeImage = (index) => {
-    // Remove image from both arrays
-    setDealImages(prevImages => prevImages.filter((_, i) => i !== index));
+    // Create a copy of the current dealImages before modifying it
+    const remainingImages = [...dealImages];
+    remainingImages.splice(index, 1);
     
     // Revoke the object URL to avoid memory leaks
     URL.revokeObjectURL(imagePreview[index]);
+    
+    // Update state
+    setDealImages(remainingImages);
     setImagePreview(prevPreviews => prevPreviews.filter((_, i) => i !== index));
+    
+    // Re-analyze remaining images if any exist
+    if (remainingImages.length > 0) {
+      // Small delay to ensure state has updated
+      setTimeout(() => analyzeFoodImage(), 100);
+    } else {
+      setFoodInspection(null);
+    }
   };
 
   const uploadImages = async (dealId) => {
@@ -149,6 +240,7 @@ export default function RestaurantHome() {
         });
         setDealImages([]);
         setImagePreview([]);
+        setFoodInspection(null);
         fetchDeals();
       }
     } catch (err) {
@@ -161,6 +253,14 @@ export default function RestaurantHome() {
   const handleLogout = () => {
     logout();
     router.push("/");
+  };
+
+  const handleAnalyzeImages = () => {
+    if (imagePreview.length > 0) {
+      analyzeFoodImage();
+    } else {
+      setFoodInspection("No images to analyze.");
+    }
   };
 
   // Show loading indicator while user is being created
@@ -296,6 +396,15 @@ export default function RestaurantHome() {
                   >
                     Take Photo
                   </button>
+                  {imagePreview.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleAnalyzeImages}
+                      className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded border border-blue-500 transition duration-200"
+                    >
+                      Analyze Food
+                    </button>
+                  )}
                 </div>
                 
                 {/* Hidden file inputs */}
@@ -335,6 +444,23 @@ export default function RestaurantHome() {
                         </button>
                       </div>
                     ))}
+                  </div>
+                )}
+                
+                {/* Food Inspection Results */}
+                {inspectionLoading && (
+                  <div className="mt-4 p-3 bg-gray-700 rounded border border-gray-600">
+                    <div className="animate-pulse flex space-x-2 items-center">
+                      <div className="h-4 w-4 bg-blue-500 rounded-full"></div>
+                      <p className="text-gray-300">Analyzing food image...</p>
+                    </div>
+                  </div>
+                )}
+                
+                {foodInspection && !inspectionLoading && (
+                  <div className="mt-4 p-4 bg-gray-700 rounded border border-blue-500">
+                    <h3 className="font-semibold text-white text-sm mb-2">Food Safety Analysis:</h3>
+                    <p className="text-gray-300 text-sm">{foodInspection}</p>
                   </div>
                 )}
               </div>

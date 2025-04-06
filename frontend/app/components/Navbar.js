@@ -28,13 +28,13 @@ export default function Navbar() {
   const customerLinks = [
     { href: "/", label: "Dashboard" },
     { href: "/browse", label: "Browse Deals" },
+    { href: "/orders", label: "My Orders" }, 
     { href: "/leaderboard", label: "Leaderboard" },
   ];
   
   // Links for signed-in restaurants/businesses
   const businessLinks = [
     { href: "/", label: "Dashboard" },
-    { href: "/deals", label: "Manage Deals" },
     { href: "/analytics", label: "Analytics" },
     { href: "/leaderboard", label: "Leaderboard" },
   ];

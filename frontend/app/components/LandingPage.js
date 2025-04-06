@@ -13,16 +13,16 @@ export default function Home() {
               </h1>
               <div className="w-20 h-1 bg-blue-500 mb-6"></div>
               <h2 className="text-3xl font-semibold mb-6 text-gray-300">
-                Rescue Food, Save Money, Help Chicago
+                Save Food, Save Money, Save Chicago
               </h2>
               <p className="text-xl mb-8 max-w-md text-gray-400">
                 Connect with nearby restaurants and shops to grab expiring food at bargain prices, or donate meals to local shelters.
               </p>
               <div className="flex space-x-4">
-                <Link href="/signup" className="bg-blue-600 text-white px-6 py-3 rounded text-lg font-medium border border-blue-500 hover:bg-blue-700 transition-colors">
+                <Link href="/signup/customer" className="bg-blue-600 text-white px-6 py-3 rounded text-lg font-medium border border-blue-500 hover:bg-blue-700 transition-colors">
                   Find Food Near You
                 </Link>
-                <Link href="/business-signup" className="bg-gray-800 text-gray-200 px-6 py-3 rounded text-lg font-medium border border-gray-600 hover:bg-gray-700 transition-colors">
+                <Link href="/signup/restaurant" className="bg-gray-800 text-gray-200 px-6 py-3 rounded text-lg font-medium border border-gray-600 hover:bg-gray-700 transition-colors">
                   Register Your Business
                 </Link>
               </div>
@@ -262,10 +262,10 @@ export default function Home() {
             Be part of the solution to food waste in Chicago. Start saving money and making a difference.
           </p>
           <div className="flex justify-center space-x-4">
-            <Link href="/signup" className="bg-blue-600 text-white px-8 py-4 rounded text-lg font-medium border border-blue-500 hover:bg-blue-700 transition-colors">
+            <Link href="/signup/customer" className="bg-blue-600 text-white px-8 py-4 rounded text-lg font-medium border border-blue-500 hover:bg-blue-700 transition-colors">
               Sign Up as a Customer
             </Link>
-            <Link href="/business-signup" className="bg-gray-700 text-white px-8 py-4 rounded text-lg font-medium border border-gray-600 hover:bg-gray-600 transition-colors">
+            <Link href="/signup/restaurant" className="bg-gray-700 text-white px-8 py-4 rounded text-lg font-medium border border-gray-600 hover:bg-gray-600 transition-colors">
               Register Your Business
             </Link>
           </div>

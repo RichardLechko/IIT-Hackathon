@@ -40,8 +40,10 @@ export default function CustomerDashboard() {
       }
 
       const { data: dealsData, error: dealsError } = await supabase
-        .from("deals")
-        .select("*, restaurant_id");
+  .from("deals")
+  .select("*, restaurant_id")
+  .eq("claimed", false);
+
 
       if (dealsError) {
         console.error("Error fetching deals:", dealsError.message);
@@ -97,9 +99,18 @@ export default function CustomerDashboard() {
 
   const DealCard = ({ deal }) => (
     <div className="bg-gray-800 border-2 border-gray-700 rounded overflow-hidden">
-      <div className="h-48 bg-gray-700 flex items-center justify-center">
-        <p className="text-gray-500">Food Image</p>
-      </div>
+      {deal.image_url ? (
+  <img
+    src={deal.image_url}
+    alt={deal.title}
+    className="w-full h-48 object-cover"
+  />
+) : (
+  <div className="h-48 bg-gray-700 flex items-center justify-center">
+    <p className="text-gray-500">No Image</p>
+  </div>
+)}
+
       <div className="p-6">
         <div className="flex justify-between items-start mb-2">
           <h3 className="text-white text-xl font-semibold">
@@ -160,12 +171,12 @@ export default function CustomerDashboard() {
 
   const handleBrowseDeals = () => {
     console.log("Browsing all deals");
-    // router.push('/browse');
+    router.push('/browse');
   };
 
   const handleViewOrders = () => {
     console.log("Viewing orders");
-    // router.push('/orders');
+    router.push('/orders');
   };
 
   return (
@@ -174,21 +185,7 @@ export default function CustomerDashboard() {
         <h1 className="text-3xl font-bold text-white mb-2">Welcome, {user?.name}</h1>
         <div className="w-16 h-1 bg-blue-500 mb-8"></div>
 
-        {/* Location selector */}
-        <div className="mb-8 flex items-center">
-          <span className="text-gray-400 mr-3">Your location:</span>
-          <select
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            className="bg-gray-800 border border-gray-700 text-white rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          >
-            <option>Chicago Loop</option>
-            <option>Wicker Park</option>
-            <option>Logan Square</option>
-            <option>Lincoln Park</option>
-            <option>West Loop</option>
-          </select>
-        </div>
+   
 
         {/* Quick actions */}
         <div className="grid grid-cols-2 gap-8 mb-12">

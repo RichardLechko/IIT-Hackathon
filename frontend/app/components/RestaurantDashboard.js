@@ -6,6 +6,36 @@ import { supabase } from "@/lib/supabase";
 import { v4 as uuidv4 } from 'uuid';
 import Anthropic from "@anthropic-ai/sdk";
 
+
+
+function Typewriter({ text, speed = 20 }) {
+  const [displayed, setDisplayed] = useState("");
+
+  useEffect(() => {
+    // Convert text safely to a trimmed string.
+    const fullText = text ? text.toString().trim() : "";
+    setDisplayed("");
+    let start = null;
+
+    const step = (timestamp) => {
+      if (!start) start = timestamp;
+      const progress = timestamp - start;
+      // Calculate the current index based on speed.
+      const currentIndex = Math.min(Math.floor(progress / speed), fullText.length);
+      setDisplayed(fullText.slice(0, currentIndex));
+      if (currentIndex < fullText.length) {
+        requestAnimationFrame(step);
+      }
+    };
+
+    requestAnimationFrame(step);
+  }, [text, speed]);
+
+  return <p className="text-gray-300 text-sm">{displayed}</p>;
+}
+
+
+
 // Initialize Anthropic - this would typically use environment variables
 const anthropic = new Anthropic({
   apiKey: process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY,
@@ -23,12 +53,14 @@ export default function RestaurantHome() {
     pickup_start: "",
     pickup_end: "",
     original_price: "",
+    updated_price: "",
   });
   const [isLoading, setIsLoading] = useState(false);
   const [dealImages, setDealImages] = useState([]);
   const [imagePreview, setImagePreview] = useState([]);
   const [foodInspection, setFoodInspection] = useState(null);
   const [inspectionLoading, setInspectionLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
 
@@ -66,6 +98,7 @@ export default function RestaurantHome() {
         break;
         
       case 'original_price':
+      case 'updated_price':
         // Only allow valid numbers with up to 2 decimal places for price
         // Regex allows empty string, digits, and up to 2 decimal places
         if (value === '' || /^\d*\.?\d{0,2}$/.test(value)) {
@@ -73,11 +106,11 @@ export default function RestaurantHome() {
         }
         break;
         
-      case 'title':
-        // Limit title length and sanitize
-        const sanitizedTitle = value.slice(0, 100).trim(); // Limit to 100 chars
-        setNewDeal({ ...newDeal, [name]: sanitizedTitle });
-        break;
+        case 'title':
+          const limitedTitle = value.slice(0, 100); // limit without trimming live input
+          setNewDeal({ ...newDeal, [name]: limitedTitle });
+          break;
+        
         
       case 'description':
         // Limit description length
@@ -214,25 +247,66 @@ export default function RestaurantHome() {
       try {
         const imageId = uuidv4();
         const filePath = `${dealId}/${imageId}.jpg`;
-
-        // Upload image to Supabase storage
-        const { data, error } = await supabase.storage
+  
+        // Upload to Supabase Storage
+        const { error } = await supabase.storage
           .from('deal-images')
           .upload(filePath, file);
-
+  
         if (error) {
           console.error('Upload error:', error);
           return null;
         }
-
-        return data;
+  
+        // Get public URL
+        const { data: publicUrlData } = supabase.storage
+          .from('deal-images')
+          .getPublicUrl(filePath);
+  
+        const publicUrl = publicUrlData.publicUrl;
+  
+        // Save the first uploaded image URL to the deal
+        if (index === 0) {
+          await supabase
+            .from('deals')
+            .update({ image_url: publicUrl })
+            .eq('id', dealId);
+        }
+  
+        return publicUrl;
       } catch (err) {
         console.error(`Error uploading image ${index}:`, err);
         return null;
       }
     });
-
+  
     return Promise.all(uploadPromises);
+  };
+  
+  // New function to delete a deal
+  const handleDeleteDeal = async (dealId) => {
+    if (!dealId) return;
+    
+    setIsDeleting(true);
+    
+    try {
+      // Remove from database
+      const { error } = await supabase
+        .from('deals')
+        .delete()
+        .eq('id', dealId);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setDeals(deals.filter(deal => deal.id !== dealId));
+      
+    } catch (err) {
+      console.error("Error deleting deal:", err);
+      // You could add an error notification here
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -251,10 +325,20 @@ export default function RestaurantHome() {
         throw new Error("Quantity must be a positive whole number");
       }
       
-      // Ensure price is a valid number
-      const price = parseFloat(newDeal.original_price);
-      if (isNaN(price) || price < 0) {
-        throw new Error("Price must be a valid number");
+      // Ensure prices are valid numbers
+      const originalPrice = parseFloat(newDeal.original_price);
+      const currentPrice = parseFloat(newDeal.updated_price);
+      
+      if (isNaN(originalPrice) || originalPrice < 0) {
+        throw new Error("Original price must be a valid number");
+      }
+      
+      if (isNaN(currentPrice) || currentPrice < 0) {
+        throw new Error("Current price must be a valid number");
+      }
+      
+      if (currentPrice > originalPrice) {
+        throw new Error("Current price cannot be higher than original price");
       }
       
       // Validate dates
@@ -296,7 +380,8 @@ export default function RestaurantHome() {
         quantity: quantity,
         pickup_start: startISO,
         pickup_end: endISO,
-        original_price: price,
+        original_price: originalPrice,
+        updated_price: currentPrice, // To maintain compatibility with customer dashboard
         claimed: false,
         restaurant_id: user.id,
       };
@@ -324,6 +409,7 @@ export default function RestaurantHome() {
           pickup_start: "",
           pickup_end: "",
           original_price: "",
+          updated_price: "",
         });
         setDealImages([]);
         setImagePreview([]);
@@ -331,6 +417,7 @@ export default function RestaurantHome() {
         fetchDeals();
       }
     } catch (err) {
+      console.error("Error creating deal:", err);
       // You could add an error state here to display user-friendly errors
       // setError(err.message);
     } finally {
@@ -421,48 +508,81 @@ export default function RestaurantHome() {
                 />
               </div>
 
-              <div className="mb-4">
-                <label className="block text-gray-300 font-medium mb-2">
-                  Original Price
-                </label>
-                <input
-                  type="number"
-                  name="original_price"
-                  value={newDeal.original_price}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white"
-                  step="0.01"
-                  min="0"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-gray-300 font-medium mb-2">
+                    Original Price
+                  </label>
+                  <input
+                    type="number"
+                    name="original_price"
+                    value={newDeal.original_price}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white"
+                    step="0.01"
+                    min="0"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-300 font-medium mb-2">
+                    Current Price
+                  </label>
+                  <input
+                    type="number"
+                    name="updated_price"
+                    value={newDeal.updated_price}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white"
+                    step="0.01"
+                    min="0"
+                    required
+                  />
+                </div>
               </div>
 
               <div className="mb-4">
-                <label className="block text-gray-300 font-medium mb-2">
-                  Pickup Start
-                </label>
-                <input
-                  type="datetime-local"
-                  name="pickup_start"
-                  value={newDeal.pickup_start}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white"
-                  required
-                />
-              </div>
+  <label className="block text-gray-300 font-medium mb-2">
+    Pickup Date
+  </label>
+  <input
+    type="date"
+    name="pickup_date"
+    value={newDeal.pickup_date || new Date().toISOString().split('T')[0]}
+    onChange={handleInputChange}
+    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+    required
+  />
+</div>
 
-              <div className="mb-4">
-                <label className="block text-gray-300 font-medium mb-2">
-                  Pickup End
-                </label>
-                <input
-                  type="datetime-local"
-                  name="pickup_end"
-                  value={newDeal.pickup_end}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white"
-                  required
-                />
-              </div>
+<div className="mb-4">
+  <label className="block text-gray-300 font-medium mb-2">
+    Pickup Start Time
+  </label>
+  <input
+    type="time"
+    name="pickup_start_time"
+    value={newDeal.pickup_start_time || "12:00"}
+    onChange={handleInputChange}
+    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+    required
+  />
+</div>
+
+<div className="mb-4">
+  <label className="block text-gray-300 font-medium mb-2">
+    Pickup End Time
+  </label>
+  <input
+    type="time"
+    name="pickup_end_time"
+    value={newDeal.pickup_end_time || "13:00"}
+    onChange={handleInputChange}
+    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+    required
+  />
+</div>
+
 
               {/* Image Upload Section */}
               <div className="mb-6">
@@ -486,12 +606,16 @@ export default function RestaurantHome() {
                   </button>
                   {imagePreview.length > 0 && (
                     <button
-                      type="button"
-                      onClick={handleAnalyzeImages}
-                      className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded border border-blue-500 transition duration-200"
-                    >
-                      Analyze Food
-                    </button>
+                    type="button"
+                    onClick={handleAnalyzeImages}
+                    className="relative bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded border transition duration-200 overflow-hidden"
+                  >
+                    <span className="absolute inset-0 pointer-events-none bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-40 rounded"></span>
+                    <span className="relative">Analyze Food</span>
+                  </button>
+                  
+                  
+                  
                   )}
                 </div>
 
@@ -545,12 +669,13 @@ export default function RestaurantHome() {
                   </div>
                 )}
 
-                {foodInspection && !inspectionLoading && (
-                  <div className="mt-4 p-4 bg-gray-700 rounded border border-blue-500">
-                    <h3 className="font-semibold text-white text-sm mb-2">Food Safety Analysis:</h3>
-                    <p className="text-gray-300 text-sm">{foodInspection}</p>
-                  </div>
-                )}
+{foodInspection && !inspectionLoading && (
+  <div className="mt-4 p-4 bg-gray-700 rounded border border-blue-500">
+    <h3 className="font-semibold text-white text-sm mb-2">Food Safety Analysis:</h3>
+    <Typewriter text={foodInspection} speed={20} />
+  </div>
+)}
+
               </div>
 
               <button
@@ -573,12 +698,27 @@ export default function RestaurantHome() {
                 <p className="text-gray-400">No active deals. Create your first deal now!</p>
               ) : (
                 deals.map((deal) => (
-                  <div key={deal.id} className="bg-gray-700 p-4 rounded border border-gray-600">
-                    <h3 className="text-white font-semibold">{deal.title}</h3>
+                  <div key={deal.id} className="bg-gray-700 p-4 rounded border border-gray-600 relative">
+                    {/* Delete button */}
+                    <button
+                      onClick={() => handleDeleteDeal(deal.id)}
+                      disabled={isDeleting}
+                      className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-full h-6 w-6 flex items-center justify-center"
+                      title="Delete Deal"
+                    >
+                      ×
+                    </button>
+                    
+                    <h3 className="text-white font-semibold pr-6">{deal.title}</h3>
                     {deal.description && <p className="text-gray-300 mt-1">{deal.description}</p>}
                     <div className="mt-2 flex flex-wrap gap-2">
                       <span className="text-sm text-gray-400">Qty: {deal.quantity}</span>
-                      <span className="text-sm text-gray-400">Price: ${deal.original_price}</span>
+                      <span className="text-sm text-gray-400">
+                        Original: ${parseFloat(deal.original_price).toFixed(2)}
+                      </span>
+                      <span className="text-sm text-gray-400">
+                        Current: ${parseFloat(deal.updated_price || deal.updated_price || 0).toFixed(2)}
+                      </span>
                       <span className="text-sm text-gray-400">
                         {formatLocalTime(deal.pickup_start)} - {formatLocalTime(deal.pickup_end)}
                       </span>

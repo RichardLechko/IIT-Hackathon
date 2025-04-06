@@ -1,8 +1,9 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/context/authContext";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { v4 as uuidv4 } from 'uuid';
 
 export default function RestaurantHome() {
   const { user, isBusiness, logout } = useAuth();
@@ -17,6 +18,10 @@ export default function RestaurantHome() {
     original_price: "",
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [dealImages, setDealImages] = useState([]);
+  const [imagePreview, setImagePreview] = useState([]);
+  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
 
   // Fetch existing deals for this restaurant
   useEffect(() => {
@@ -50,6 +55,58 @@ export default function RestaurantHome() {
     return date.toISOString().slice(0, 16); // Format: YYYY-MM-DDThh:mm
   };
 
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files);
+    
+    // Add new files to the state
+    setDealImages(prevImages => [...prevImages, ...files]);
+    
+    // Generate preview URLs
+    const newPreviews = files.map(file => URL.createObjectURL(file));
+    setImagePreview(prevPreviews => [...prevPreviews, ...newPreviews]);
+  };
+
+  const handleTakePhoto = () => {
+    if (cameraInputRef.current) {
+      cameraInputRef.current.click();
+    }
+  };
+
+  const removeImage = (index) => {
+    // Remove image from both arrays
+    setDealImages(prevImages => prevImages.filter((_, i) => i !== index));
+    
+    // Revoke the object URL to avoid memory leaks
+    URL.revokeObjectURL(imagePreview[index]);
+    setImagePreview(prevPreviews => prevPreviews.filter((_, i) => i !== index));
+  };
+
+  const uploadImages = async (dealId) => {
+    const uploadPromises = dealImages.map(async (file, index) => {
+      try {
+        const imageId = uuidv4();
+        const filePath = `${dealId}/${imageId}.jpg`;
+        
+        // Upload image to Supabase storage
+        const { data, error } = await supabase.storage
+          .from('deal-images')
+          .upload(filePath, file);
+        
+        if (error) {
+          console.error('Upload error:', error);
+          return null;
+        }
+        
+        return data;
+      } catch (err) {
+        console.error(`Error uploading image ${index}:`, err);
+        return null;
+      }
+    });
+    
+    return Promise.all(uploadPromises);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -64,8 +121,6 @@ export default function RestaurantHome() {
         original_price: parseFloat(newDeal.original_price),
         claimed: false,
         restaurant_id: user.id,
-        // Remove any id field if it exists
-        // Let Supabase handle the id generation
       };
 
       const { data, error } = await supabase
@@ -75,7 +130,14 @@ export default function RestaurantHome() {
       
       if (error) throw error;
       
-      if (data) {
+      if (data && data[0]) {
+        const dealId = data[0].id;
+        
+        // Upload images if any
+        if (dealImages.length > 0) {
+          await uploadImages(dealId);
+        }
+        
         // Reset form and refresh deals
         setNewDeal({
           title: "",
@@ -85,6 +147,8 @@ export default function RestaurantHome() {
           pickup_end: "",
           original_price: "",
         });
+        setDealImages([]);
+        setImagePreview([]);
         fetchDeals();
       }
     } catch (err) {
@@ -210,6 +274,69 @@ export default function RestaurantHome() {
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white"
                   required
                 />
+              </div>
+
+              {/* Image Upload Section */}
+              <div className="mb-6">
+                <label className="block text-gray-300 font-medium mb-2">
+                  Deal Images
+                </label>
+                <div className="flex space-x-3 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current.click()}
+                    className="bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded border border-gray-600 transition duration-200"
+                  >
+                    Upload Image
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleTakePhoto}
+                    className="bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded border border-gray-600 transition duration-200"
+                  >
+                    Take Photo
+                  </button>
+                </div>
+                
+                {/* Hidden file inputs */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  onChange={handleFileChange}
+                  accept="image/*"
+                  className="hidden"
+                  multiple
+                />
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  onChange={handleFileChange}
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                />
+                
+                {/* Image preview section */}
+                {imagePreview.length > 0 && (
+                  <div className="mt-3 grid grid-cols-3 gap-3">
+                    {imagePreview.map((src, index) => (
+                      <div key={index} className="relative bg-gray-700 rounded p-1">
+                        <img 
+                          src={src} 
+                          alt={`Preview ${index}`} 
+                          className="w-full h-24 object-cover rounded"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeImage(index)}
+                          className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white p-1 rounded-full h-6 w-6 flex items-center justify-center"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <button

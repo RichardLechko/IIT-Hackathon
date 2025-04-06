@@ -205,102 +205,101 @@ export default function Home() {
         </div>
       </section>
 
-      {/* For Businesses */}
-      <section
-        className="py-24 bg-gray-900 border-b border-gray-700"
-        id="for-businesses"
-      >
-        <div className="max-w-7xl mx-auto px-8">
-          <div className="flex items-center">
-            <div className="w-1/2">
-              <h2 className="text-3xl font-bold text-white mb-2">
-                For Chicago Businesses
-              </h2>
-              <div className="w-16 h-1 bg-blue-500 mb-6"></div>
-              <p className="text-lg text-gray-400 mb-8">
-                Join our mission to reduce food waste while recovering costs on
-                surplus inventory.
-              </p>
-              <div className="p-8 border-2 border-gray-700 rounded bg-gray-800 mb-8">
-                <ul className="space-y-6">
-                  <li className="flex items-center">
-                    <div className="h-8 w-8 bg-gray-700 rounded-full flex items-center justify-center mr-4 border border-blue-500">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        className="h-5 w-5 text-blue-400"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                    </div>
-                    <span className="text-gray-300 font-medium">
-                      Reduce waste and boost sustainability efforts
-                    </span>
-                  </li>
-                  <li className="flex items-center">
-                    <div className="h-8 w-8 bg-gray-700 rounded-full flex items-center justify-center mr-4 border border-blue-500">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        className="h-5 w-5 text-blue-400"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                    </div>
-                    <span className="text-gray-300 font-medium">
-                      Recover costs on food that would otherwise be discarded
-                    </span>
-                  </li>
-                  <li className="flex items-center">
-                    <div className="h-8 w-8 bg-gray-700 rounded-full flex items-center justify-center mr-4 border border-blue-500">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        className="h-5 w-5 text-blue-400"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                    </div>
-                    <span className="text-gray-300 font-medium">
-                      Attract new customers who may become regulars
-                    </span>
-                  </li>
-                </ul>
-              </div>
-              <div>
-                <Link
-                  href="/business-signup"
-                  className="bg-blue-600 text-white px-6 py-3 rounded text-lg font-medium hover:bg-blue-700 border border-blue-500 transition-colors"
+    {/* For Businesses */}
+<section
+  className="py-24 bg-gray-900 border-b border-gray-700"
+  id="for-businesses"
+>
+  <div className="max-w-7xl mx-auto px-8">
+    <div className="flex items-center justify-center">
+      <div className="w-full md:w-1/2 text-center">
+        <h2 className="text-3xl font-bold text-white mb-2">
+          For Chicago Businesses
+        </h2>
+        <div className="w-16 h-1 bg-blue-500 mb-6 mx-auto"></div>
+        <p className="text-lg text-gray-400 mb-8">
+          Join our mission to reduce food waste while recovering costs on
+          surplus inventory.
+        </p>
+        <div className="p-8 border-2 border-gray-700 rounded bg-gray-800 mb-8">
+          <ul className="space-y-6">
+            <li className="flex items-center justify-center">
+              <div className="h-8 w-8 bg-gray-700 rounded-full flex items-center justify-center mr-4 border border-blue-500">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  className="h-5 w-5 text-blue-400"
                 >
-                  Register Your Business
-                </Link>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
               </div>
-            </div>
-            
-          </div>
+              <span className="text-gray-300 font-medium">
+                Reduce waste and boost sustainability efforts
+              </span>
+            </li>
+            <li className="flex items-center justify-center">
+              <div className="h-8 w-8 bg-gray-700 rounded-full flex items-center justify-center mr-4 border border-blue-500">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  className="h-5 w-5 text-blue-400"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              </div>
+              <span className="text-gray-300 font-medium">
+                Recover costs on food that would otherwise be discarded
+              </span>
+            </li>
+            <li className="flex items-center justify-center">
+              <div className="h-8 w-8 bg-gray-700 rounded-full flex items-center justify-center mr-4 border border-blue-500">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  className="h-5 w-5 text-blue-400"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              </div>
+              <span className="text-gray-300 font-medium">
+                Attract new customers who may become regulars
+              </span>
+            </li>
+          </ul>
         </div>
-      </section>
+        <div>
+          <Link
+            href="/business-signup"
+            className="bg-blue-600 text-white px-6 py-3 rounded text-lg font-medium hover:bg-blue-700 border border-blue-500 transition-colors"
+          >
+            Register Your Business
+          </Link>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
       
          

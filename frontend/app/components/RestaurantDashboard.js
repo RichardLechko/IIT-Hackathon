@@ -9,7 +9,7 @@ import Anthropic from "@anthropic-ai/sdk";
 // Initialize Anthropic - this would typically use environment variables
 const anthropic = new Anthropic({
   apiKey: process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY,
-  dangerouslyAllowBrowser: true 
+  dangerouslyAllowBrowser: true
 });
 
 export default function RestaurantHome() {
@@ -46,7 +46,7 @@ export default function RestaurantHome() {
         .select('*')
         .eq('restaurant_id', user.id)
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
       setDeals(data || []);
     } catch (err) {
@@ -56,7 +56,44 @@ export default function RestaurantHome() {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setNewDeal({ ...newDeal, [name]: value });
+    
+    // Apply specific sanitization based on field type
+    switch (name) {
+      case 'quantity':
+        // Force quantity to be an integer by removing decimals
+        const sanitizedQuantity = value === '' ? '' : Math.floor(parseFloat(value)) || '';
+        setNewDeal({ ...newDeal, [name]: sanitizedQuantity.toString() });
+        break;
+        
+      case 'original_price':
+        // Only allow valid numbers with up to 2 decimal places for price
+        // Regex allows empty string, digits, and up to 2 decimal places
+        if (value === '' || /^\d*\.?\d{0,2}$/.test(value)) {
+          setNewDeal({ ...newDeal, [name]: value });
+        }
+        break;
+        
+      case 'title':
+        // Limit title length and sanitize
+        const sanitizedTitle = value.slice(0, 100).trim(); // Limit to 100 chars
+        setNewDeal({ ...newDeal, [name]: sanitizedTitle });
+        break;
+        
+      case 'description':
+        // Limit description length
+        const sanitizedDesc = value.slice(0, 500); // Limit to 500 chars
+        setNewDeal({ ...newDeal, [name]: sanitizedDesc });
+        break;
+        
+      default:
+        // Default handler for other fields like dates
+        setNewDeal({ ...newDeal, [name]: value });
+    }
+  };
+
+  const formatLocalTime = (isoString) => {
+    const date = new Date(isoString);
+    return date.toLocaleString();
   };
 
   const formatDateTimeForInput = (dateString) => {
@@ -74,11 +111,11 @@ export default function RestaurantHome() {
 
     setInspectionLoading(true);
     setFoodInspection(null);
-    
+
     try {
       // Get the current dealImages - make a local reference to avoid closure issues
       const currentImages = [...dealImages];
-      
+
       // Convert all images to base64
       const imagePromises = currentImages.map(async (file) => {
         const base64Image = await fileToBase64(file);
@@ -87,9 +124,9 @@ export default function RestaurantHome() {
           mediaType: file.type
         };
       });
-      
+
       const images = await Promise.all(imagePromises);
-      
+
       // Call our API endpoint with all images
       const response = await fetch('/api/analyze-food', {
         method: 'POST',
@@ -98,12 +135,12 @@ export default function RestaurantHome() {
         },
         body: JSON.stringify({ images }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to analyze images');
       }
-      
+
       const data = await response.json();
       setFoodInspection(data.result);
     } catch (error) {
@@ -121,7 +158,7 @@ export default function RestaurantHome() {
         reject(new Error("File is undefined"));
         return;
       }
-      
+
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => resolve(reader.result);
@@ -132,16 +169,16 @@ export default function RestaurantHome() {
   // Update handleFileChange to not auto-analyze
   const handleFileChange = async (e) => {
     const files = Array.from(e.target.files || []);
-    
+
     if (files.length === 0) return;
-    
+
     // Add new files to the state
     setDealImages(prevImages => [...prevImages, ...files]);
-    
+
     // Generate preview URLs
     const newPreviews = files.map(file => URL.createObjectURL(file));
     setImagePreview(prevPreviews => [...prevPreviews, ...newPreviews]);
-    
+
     // Don't auto-analyze - let user click the button
   };
 
@@ -155,14 +192,14 @@ export default function RestaurantHome() {
     // Create a copy of the current dealImages before modifying it
     const remainingImages = [...dealImages];
     remainingImages.splice(index, 1);
-    
+
     // Revoke the object URL to avoid memory leaks
     URL.revokeObjectURL(imagePreview[index]);
-    
+
     // Update state
     setDealImages(remainingImages);
     setImagePreview(prevPreviews => prevPreviews.filter((_, i) => i !== index));
-    
+
     // Re-analyze remaining images if any exist
     if (remainingImages.length > 0) {
       // Small delay to ensure state has updated
@@ -177,43 +214,93 @@ export default function RestaurantHome() {
       try {
         const imageId = uuidv4();
         const filePath = `${dealId}/${imageId}.jpg`;
-        
+
         // Upload image to Supabase storage
         const { data, error } = await supabase.storage
           .from('deal-images')
           .upload(filePath, file);
-        
+
         if (error) {
           console.error('Upload error:', error);
           return null;
         }
-        
+
         return data;
       } catch (err) {
         console.error(`Error uploading image ${index}:`, err);
         return null;
       }
     });
-    
+
     return Promise.all(uploadPromises);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-
+  
     try {
+      // Validate required fields
+      if (!newDeal.title.trim()) {
+        throw new Error("Title is required");
+      }
+      
+      // Ensure quantity is a positive integer
+      const quantity = parseInt(newDeal.quantity, 10);
+      if (isNaN(quantity) || quantity < 1) {
+        throw new Error("Quantity must be a positive whole number");
+      }
+      
+      // Ensure price is a valid number
+      const price = parseFloat(newDeal.original_price);
+      if (isNaN(price) || price < 0) {
+        throw new Error("Price must be a valid number");
+      }
+      
+      // Validate dates
+      const pickupStart = new Date(newDeal.pickup_start);
+      const pickupEnd = new Date(newDeal.pickup_end);
+      
+      if (isNaN(pickupStart.getTime()) || isNaN(pickupEnd.getTime())) {
+        throw new Error("Please select valid pickup times");
+      }
+      
+      if (pickupEnd <= pickupStart) {
+        throw new Error("Pickup end time must be after start time");
+      }
+      
+      // Create ISO strings that preserve the selected local time
+      const startISO = new Date(
+        Date.UTC(
+          pickupStart.getFullYear(),
+          pickupStart.getMonth(),
+          pickupStart.getDate(),
+          pickupStart.getHours(),
+          pickupStart.getMinutes()
+        )
+      ).toISOString();
+      
+      const endISO = new Date(
+        Date.UTC(
+          pickupEnd.getFullYear(),
+          pickupEnd.getMonth(),
+          pickupEnd.getDate(),
+          pickupEnd.getHours(),
+          pickupEnd.getMinutes()
+        )
+      ).toISOString();
+  
       const dealData = {
-        title: newDeal.title,
-        description: newDeal.description,
-        quantity: parseInt(newDeal.quantity, 10),
-        pickup_start: new Date(newDeal.pickup_start).toISOString(),
-        pickup_end: new Date(newDeal.pickup_end).toISOString(),
-        original_price: parseFloat(newDeal.original_price),
+        title: newDeal.title.trim(),
+        description: newDeal.description.trim(),
+        quantity: quantity,
+        pickup_start: startISO,
+        pickup_end: endISO,
+        original_price: price,
         claimed: false,
         restaurant_id: user.id,
       };
-
+  
       const { data, error } = await supabase
         .from('deals')
         .insert([dealData])
@@ -229,7 +316,7 @@ export default function RestaurantHome() {
           await uploadImages(dealId);
         }
         
-        // Reset form and refresh deals
+        // Reset form
         setNewDeal({
           title: "",
           description: "",
@@ -244,7 +331,8 @@ export default function RestaurantHome() {
         fetchDeals();
       }
     } catch (err) {
-      console.error('Error creating deal:', err);
+      // You could add an error state here to display user-friendly errors
+      // setError(err.message);
     } finally {
       setIsLoading(false);
     }
@@ -406,7 +494,7 @@ export default function RestaurantHome() {
                     </button>
                   )}
                 </div>
-                
+
                 {/* Hidden file inputs */}
                 <input
                   ref={fileInputRef}
@@ -424,15 +512,15 @@ export default function RestaurantHome() {
                   capture="environment"
                   className="hidden"
                 />
-                
+
                 {/* Image preview section */}
                 {imagePreview.length > 0 && (
                   <div className="mt-3 grid grid-cols-3 gap-3">
                     {imagePreview.map((src, index) => (
                       <div key={index} className="relative bg-gray-700 rounded p-1">
-                        <img 
-                          src={src} 
-                          alt={`Preview ${index}`} 
+                        <img
+                          src={src}
+                          alt={`Preview ${index}`}
                           className="w-full h-24 object-cover rounded"
                         />
                         <button
@@ -446,7 +534,7 @@ export default function RestaurantHome() {
                     ))}
                   </div>
                 )}
-                
+
                 {/* Food Inspection Results */}
                 {inspectionLoading && (
                   <div className="mt-4 p-3 bg-gray-700 rounded border border-gray-600">
@@ -456,7 +544,7 @@ export default function RestaurantHome() {
                     </div>
                   </div>
                 )}
-                
+
                 {foodInspection && !inspectionLoading && (
                   <div className="mt-4 p-4 bg-gray-700 rounded border border-blue-500">
                     <h3 className="font-semibold text-white text-sm mb-2">Food Safety Analysis:</h3>
@@ -492,7 +580,7 @@ export default function RestaurantHome() {
                       <span className="text-sm text-gray-400">Qty: {deal.quantity}</span>
                       <span className="text-sm text-gray-400">Price: ${deal.original_price}</span>
                       <span className="text-sm text-gray-400">
-                        {new Date(deal.pickup_start).toLocaleString()} - {new Date(deal.pickup_end).toLocaleString()}
+                        {formatLocalTime(deal.pickup_start)} - {formatLocalTime(deal.pickup_end)}
                       </span>
                     </div>
                     <div className="mt-2">

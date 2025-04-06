@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/context/authContext";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import Link from "next/link";
 
 // Haversine distance formula
 function calculateDistanceMiles(lat1, lng1, lat2, lng2) {
@@ -196,12 +197,14 @@ export default function CustomerDashboard() {
             <p className="text-gray-400 mb-6">
               Discover food deals available near your location.
             </p>
-            <button
-              onClick={handleBrowseDeals}
-              className="bg-blue-600 text-white px-4 py-2 rounded border border-blue-500 hover:bg-blue-700 transition-colors"
-            >
-              Browse Deals
-            </button>
+            <Link href="/browse">
+              <button
+                onClick={handleBrowseDeals}
+                className="bg-blue-600 text-white px-4 py-2 rounded border border-blue-500 hover:bg-blue-700 transition-colors"
+              >
+                Browse Deals
+              </button>
+            </Link>
           </div>
 
           <div className="bg-gray-800 border-2 border-gray-700 rounded p-6">

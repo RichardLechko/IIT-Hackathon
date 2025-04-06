@@ -1,6 +1,87 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&display=swap');
 @import "tailwindcss";
 
+/* For Webkit browsers (Chrome, Safari, newer versions of Opera) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1f2937; /* gray-800 equivalent */
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3b82f6; /* blue-500 equivalent */
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #2563eb; /* blue-600 equivalent */
+}
+
+* {
+  scroll-behavior: smooth;
+  scrollbar-color: #3b82f6 #1f2937;
+}
+
+body {
+  -ms-overflow-style: -ms-autohiding-scrollbar;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Space Grotesk", sans-serif;
+}
+
+/* For specific containers with custom scrollbars */
+.custom-scrollbar {
+  overflow: auto;
+  scrollbar-width: thin; /* For Firefox */
+  scrollbar-color: #3b82f6 #1f2937; /* For Firefox */
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #1f2937;
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #3b82f6;
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #2563eb;
+}
+
+/* For horizontal scrollbars (e.g., in tables) */
+.horizontal-scroll {
+  overflow-x: auto;
+}
+
+.horizontal-scroll::-webkit-scrollbar {
+  height: 6px; /* Thinner for horizontal scrollbars */
+}
+
+/* Responsive adjustments for mobile */
+@media (max-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -20,12 +101,6 @@
   }
 }
 
-* {
-  scroll-behavior: smooth;
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: "Space Grotesk", sans-serif;
+a {
+  cursor: pointer;
 }

@@ -94,10 +94,50 @@ export default function RestaurantSignup() {
     );
   };
 
+  // Validation functions
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePassword = (password) => {
+    return password.length >= 8;
+  };
+
+  const validatePhoneNumber = (phone) => {
+    const phoneRegex = /^\(?\d{3}\)?[-. ]?\d{3}[-. ]?\d{4}$/;
+    return phoneRegex.test(phone);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
+    
+    // Input validation
+    if (!formData.name.trim()) {
+      setError("Business name is required");
+      setIsLoading(false);
+      return;
+    }
+    
+    if (!validateEmail(formData.email)) {
+      setError("Please enter a valid email address");
+      setIsLoading(false);
+      return;
+    }
+    
+    if (!validatePhoneNumber(formData.phoneNumber)) {
+      setError("Please enter a valid phone number (e.g., (312) 555-1234)");
+      setIsLoading(false);
+      return;
+    }
+    
+    if (!validatePassword(formData.password)) {
+      setError("Password must be at least 8 characters long");
+      setIsLoading(false);
+      return;
+    }
     
     // Validate password match
     if (formData.password !== formData.confirmPassword) {
@@ -116,19 +156,25 @@ export default function RestaurantSignup() {
         .from('users')
         .insert([
           { 
-            name: formData.name,
-            email: formData.email,
+            name: formData.name.trim(),
+            email: formData.email.trim().toLowerCase(),
             password_hash: hashedPassword,
-            phone_number: formData.phoneNumber,
+            phone_number: formData.phoneNumber.trim(),
             is_restaurant: true,
             lat: coordinates.lat, 
             lng: coordinates.lng,
-            created_at: new Date()
+            created_at: new Date().toISOString()
           }
         ])
         .select();
       
-      if (error) throw error;
+      if (error) {
+        // Check for duplicate email error
+        if (error.code === '23505') {
+          throw new Error("This email is already registered. Please use a different email or log in.");
+        }
+        throw error;
+      }
       
       if (data && data[0]) {
         // Use the auth context to log the user in
@@ -191,6 +237,7 @@ export default function RestaurantSignup() {
                 value={formData.name}
                 onChange={handleChange}
                 placeholder="Your Restaurant Name"
+                maxLength={100}
               />
             </div>
 
@@ -207,6 +254,8 @@ export default function RestaurantSignup() {
                 value={formData.email}
                 onChange={handleChange}
                 placeholder="you@example.com"
+                pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
+                title="Please enter a valid email address"
               />
             </div>
 
@@ -224,6 +273,7 @@ export default function RestaurantSignup() {
                 onChange={handleChange}
                 placeholder="123 Main St, Chicago, IL"
                 disabled={useCurrentLocation}
+                maxLength={200}
               />
               <div className="mt-2 flex items-center">
                 <input
@@ -262,6 +312,8 @@ export default function RestaurantSignup() {
                 value={formData.phoneNumber}
                 onChange={handleChange}
                 placeholder="(312) 555-1234"
+                pattern="\(?\d{3}\)?[-. ]?\d{3}[-. ]?\d{4}"
+                title="Please enter a valid phone number"
               />
             </div>
 
@@ -278,7 +330,12 @@ export default function RestaurantSignup() {
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="••••••••"
+                minLength={8}
+                title="Password must be at least 8 characters long"
               />
+              <p className="mt-1 text-xs text-gray-400">
+                Minimum 8 characters
+              </p>
             </div>
 
             <div>

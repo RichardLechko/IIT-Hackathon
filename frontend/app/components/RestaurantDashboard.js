@@ -1,18 +1,17 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, memo } from "react";
 import { useAuth } from "@/context/authContext";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 import { v4 as uuidv4 } from 'uuid';
 import Anthropic from "@anthropic-ai/sdk";
 
-
-
-function Typewriter({ text, speed = 20 }) {
+// Memoized Typewriter component for better performance
+const Typewriter = memo(({ text, speed = 20 }) => {
   const [displayed, setDisplayed] = useState("");
 
   useEffect(() => {
-    // Convert text safely to a trimmed string.
+    // Convert text safely to a trimmed string
     const fullText = text ? text.toString().trim() : "";
     setDisplayed("");
     let start = null;
@@ -20,7 +19,7 @@ function Typewriter({ text, speed = 20 }) {
     const step = (timestamp) => {
       if (!start) start = timestamp;
       const progress = timestamp - start;
-      // Calculate the current index based on speed.
+      // Calculate the current index based on speed
       const currentIndex = Math.min(Math.floor(progress / speed), fullText.length);
       setDisplayed(fullText.slice(0, currentIndex));
       if (currentIndex < fullText.length) {
@@ -32,15 +31,54 @@ function Typewriter({ text, speed = 20 }) {
   }, [text, speed]);
 
   return <p className="text-gray-300 text-sm">{displayed}</p>;
-}
-
-
-
-// Initialize Anthropic - this would typically use environment variables
-const anthropic = new Anthropic({
-  apiKey: process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY,
-  dangerouslyAllowBrowser: true
 });
+
+// Memoized DealItem component
+const DealItem = memo(({ deal, handleDeleteDeal, isDeleting, formatLocalTime }) => (
+  <div className="bg-gray-700 p-4 rounded border border-gray-600 relative">
+    {/* Delete button */}
+    <button
+      onClick={() => handleDeleteDeal(deal.id)}
+      disabled={isDeleting}
+      className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-full h-6 w-6 flex items-center justify-center"
+      title="Delete Deal"
+    >
+      ×
+    </button>
+    
+    <h3 className="text-white font-semibold pr-6">{deal.title}</h3>
+    {deal.description && <p className="text-gray-300 mt-1">{deal.description}</p>}
+    <div className="mt-2 flex flex-wrap gap-2">
+      <span className="text-sm text-gray-400">Qty: {deal.quantity}</span>
+      <span className="text-sm text-gray-400">
+        Original: ${parseFloat(deal.original_price).toFixed(2)}
+      </span>
+      <span className="text-sm text-gray-400">
+        Current: ${parseFloat(deal.updated_price || 0).toFixed(2)}
+      </span>
+      <span className="text-sm text-gray-400">
+        {formatLocalTime(deal.pickup_start)} - {formatLocalTime(deal.pickup_end)}
+      </span>
+    </div>
+    <div className="mt-2">
+      <span className={`text-sm px-2 py-1 rounded ${deal.claimed ? "bg-green-900 text-green-300" : "bg-blue-900 text-blue-300"}`}>
+        {deal.claimed ? "Claimed" : "Available"}
+      </span>
+    </div>
+  </div>
+));
+
+// Initialize Anthropic - use a lazy init approach to prevent unnecessary instances
+let anthropicClient = null;
+const getAnthropic = () => {
+  if (!anthropicClient && process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY) {
+    anthropicClient = new Anthropic({
+      apiKey: process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY,
+      dangerouslyAllowBrowser: true
+    });
+  }
+  return anthropicClient;
+};
 
 export default function RestaurantHome() {
   const { user, isBusiness, logout } = useAuth();
@@ -54,6 +92,9 @@ export default function RestaurantHome() {
     pickup_end: "",
     original_price: "",
     updated_price: "",
+    pickup_date: new Date().toISOString().split('T')[0],
+    pickup_start_time: "12:00",
+    pickup_end_time: "13:00"
   });
   const [isLoading, setIsLoading] = useState(false);
   const [dealImages, setDealImages] = useState([]);
@@ -73,6 +114,7 @@ export default function RestaurantHome() {
 
   const fetchDeals = async () => {
     try {
+      const supabase = getSupabase();
       const { data, error } = await supabase
         .from('deals')
         .select('*')
@@ -106,11 +148,10 @@ export default function RestaurantHome() {
         }
         break;
         
-        case 'title':
-          const limitedTitle = value.slice(0, 100); // limit without trimming live input
-          setNewDeal({ ...newDeal, [name]: limitedTitle });
-          break;
-        
+      case 'title':
+        const limitedTitle = value.slice(0, 100); // limit without trimming live input
+        setNewDeal({ ...newDeal, [name]: limitedTitle });
+        break;
         
       case 'description':
         // Limit description length
@@ -125,13 +166,14 @@ export default function RestaurantHome() {
   };
 
   const formatLocalTime = (isoString) => {
-    const date = new Date(isoString);
-    return date.toLocaleString();
-  };
-
-  const formatDateTimeForInput = (dateString) => {
-    const date = new Date(dateString);
-    return date.toISOString().slice(0, 16); // Format: YYYY-MM-DDThh:mm
+    if (!isoString) return '';
+    try {
+      const date = new Date(isoString);
+      return date.toLocaleString();
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return '';
+    }
   };
 
   // Function to analyze food images with our API route
@@ -149,12 +191,12 @@ export default function RestaurantHome() {
       // Get the current dealImages - make a local reference to avoid closure issues
       const currentImages = [...dealImages];
 
-      // Convert all images to base64
-      const imagePromises = currentImages.map(async (file) => {
-        const base64Image = await fileToBase64(file);
+      // Convert images to base64 using a more efficient approach
+      const imagePromises = currentImages.map(fileToBase64).map(async (promise) => {
+        const base64Image = await promise;
         return {
           imageData: base64Image.split(',')[1],
-          mediaType: file.type
+          mediaType: dealImages[0].type
         };
       });
 
@@ -184,7 +226,7 @@ export default function RestaurantHome() {
     }
   };
 
-  // Modify the fileToBase64 function to be more robust
+  // Improved fileToBase64 function with better error handling
   const fileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
       if (!file) {
@@ -193,26 +235,23 @@ export default function RestaurantHome() {
       }
 
       const reader = new FileReader();
-      reader.readAsDataURL(file);
       reader.onload = () => resolve(reader.result);
       reader.onerror = (error) => reject(error);
+      reader.readAsDataURL(file);
     });
   };
 
-  // Update handleFileChange to not auto-analyze
   const handleFileChange = async (e) => {
     const files = Array.from(e.target.files || []);
 
     if (files.length === 0) return;
 
-    // Add new files to the state
+    // Add new files to the state - use functional updates for better state handling
     setDealImages(prevImages => [...prevImages, ...files]);
 
     // Generate preview URLs
     const newPreviews = files.map(file => URL.createObjectURL(file));
     setImagePreview(prevPreviews => [...prevPreviews, ...newPreviews]);
-
-    // Don't auto-analyze - let user click the button
   };
 
   const handleTakePhoto = () => {
@@ -223,26 +262,31 @@ export default function RestaurantHome() {
 
   const removeImage = (index) => {
     // Create a copy of the current dealImages before modifying it
-    const remainingImages = [...dealImages];
-    remainingImages.splice(index, 1);
+    setDealImages(prevImages => {
+      const newImages = [...prevImages];
+      newImages.splice(index, 1);
+      return newImages;
+    });
 
     // Revoke the object URL to avoid memory leaks
-    URL.revokeObjectURL(imagePreview[index]);
-
-    // Update state
-    setDealImages(remainingImages);
-    setImagePreview(prevPreviews => prevPreviews.filter((_, i) => i !== index));
+    setImagePreview(prevPreviews => {
+      URL.revokeObjectURL(prevPreviews[index]);
+      return prevPreviews.filter((_, i) => i !== index);
+    });
 
     // Re-analyze remaining images if any exist
-    if (remainingImages.length > 0) {
-      // Small delay to ensure state has updated
-      setTimeout(() => analyzeFoodImage(), 100);
-    } else {
-      setFoodInspection(null);
-    }
+    setTimeout(() => {
+      if (dealImages.length > 1) { // Check remaining images after removal
+        analyzeFoodImage();
+      } else {
+        setFoodInspection(null);
+      }
+    }, 100);
   };
 
   const uploadImages = async (dealId) => {
+    const supabase = getSupabase();
+    
     const uploadPromises = dealImages.map(async (file, index) => {
       try {
         const imageId = uuidv4();
@@ -283,13 +327,14 @@ export default function RestaurantHome() {
     return Promise.all(uploadPromises);
   };
   
-  // New function to delete a deal
+  // Function to delete a deal
   const handleDeleteDeal = async (dealId) => {
     if (!dealId) return;
     
     setIsDeleting(true);
     
     try {
+      const supabase = getSupabase();
       // Remove from database
       const { error } = await supabase
         .from('deals')
@@ -341,9 +386,13 @@ export default function RestaurantHome() {
         throw new Error("Current price cannot be higher than original price");
       }
       
-      // Validate dates
-      const pickupStart = new Date(newDeal.pickup_start);
-      const pickupEnd = new Date(newDeal.pickup_end);
+      // Create date objects from the date and time inputs
+      const pickupDate = newDeal.pickup_date;
+      const [startHours, startMinutes] = newDeal.pickup_start_time.split(':').map(Number);
+      const [endHours, endMinutes] = newDeal.pickup_end_time.split(':').map(Number);
+      
+      const pickupStart = new Date(`${pickupDate}T${newDeal.pickup_start_time}`);
+      const pickupEnd = new Date(`${pickupDate}T${newDeal.pickup_end_time}`);
       
       if (isNaN(pickupStart.getTime()) || isNaN(pickupEnd.getTime())) {
         throw new Error("Please select valid pickup times");
@@ -353,26 +402,9 @@ export default function RestaurantHome() {
         throw new Error("Pickup end time must be after start time");
       }
       
-      // Create ISO strings that preserve the selected local time
-      const startISO = new Date(
-        Date.UTC(
-          pickupStart.getFullYear(),
-          pickupStart.getMonth(),
-          pickupStart.getDate(),
-          pickupStart.getHours(),
-          pickupStart.getMinutes()
-        )
-      ).toISOString();
-      
-      const endISO = new Date(
-        Date.UTC(
-          pickupEnd.getFullYear(),
-          pickupEnd.getMonth(),
-          pickupEnd.getDate(),
-          pickupEnd.getHours(),
-          pickupEnd.getMinutes()
-        )
-      ).toISOString();
+      // Create ISO strings
+      const startISO = pickupStart.toISOString();
+      const endISO = pickupEnd.toISOString();
   
       const dealData = {
         title: newDeal.title.trim(),
@@ -381,11 +413,12 @@ export default function RestaurantHome() {
         pickup_start: startISO,
         pickup_end: endISO,
         original_price: originalPrice,
-        updated_price: currentPrice, // To maintain compatibility with customer dashboard
+        updated_price: currentPrice,
         claimed: false,
         restaurant_id: user.id,
       };
   
+      const supabase = getSupabase();
       const { data, error } = await supabase
         .from('deals')
         .insert([dealData])
@@ -410,6 +443,9 @@ export default function RestaurantHome() {
           pickup_end: "",
           original_price: "",
           updated_price: "",
+          pickup_date: new Date().toISOString().split('T')[0],
+          pickup_start_time: "12:00",
+          pickup_end_time: "13:00"
         });
         setDealImages([]);
         setImagePreview([]);
@@ -542,47 +578,46 @@ export default function RestaurantHome() {
               </div>
 
               <div className="mb-4">
-  <label className="block text-gray-300 font-medium mb-2">
-    Pickup Date
-  </label>
-  <input
-    type="date"
-    name="pickup_date"
-    value={newDeal.pickup_date || new Date().toISOString().split('T')[0]}
-    onChange={handleInputChange}
-    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
-    required
-  />
-</div>
+                <label className="block text-gray-300 font-medium mb-2">
+                  Pickup Date
+                </label>
+                <input
+                  type="date"
+                  name="pickup_date"
+                  value={newDeal.pickup_date}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                  required
+                />
+              </div>
 
-<div className="mb-4">
-  <label className="block text-gray-300 font-medium mb-2">
-    Pickup Start Time
-  </label>
-  <input
-    type="time"
-    name="pickup_start_time"
-    value={newDeal.pickup_start_time || "12:00"}
-    onChange={handleInputChange}
-    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
-    required
-  />
-</div>
+              <div className="mb-4">
+                <label className="block text-gray-300 font-medium mb-2">
+                  Pickup Start Time
+                </label>
+                <input
+                  type="time"
+                  name="pickup_start_time"
+                  value={newDeal.pickup_start_time}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                  required
+                />
+              </div>
 
-<div className="mb-4">
-  <label className="block text-gray-300 font-medium mb-2">
-    Pickup End Time
-  </label>
-  <input
-    type="time"
-    name="pickup_end_time"
-    value={newDeal.pickup_end_time || "13:00"}
-    onChange={handleInputChange}
-    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
-    required
-  />
-</div>
-
+              <div className="mb-4">
+                <label className="block text-gray-300 font-medium mb-2">
+                  Pickup End Time
+                </label>
+                <input
+                  type="time"
+                  name="pickup_end_time"
+                  value={newDeal.pickup_end_time}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white"
+                  required
+                />
+              </div>
 
               {/* Image Upload Section */}
               <div className="mb-6">
@@ -606,16 +641,13 @@ export default function RestaurantHome() {
                   </button>
                   {imagePreview.length > 0 && (
                     <button
-                    type="button"
-                    onClick={handleAnalyzeImages}
-                    className="relative bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded border transition duration-200 overflow-hidden"
-                  >
-                    <span className="absolute inset-0 pointer-events-none bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-40 rounded"></span>
-                    <span className="relative">Analyze Food</span>
-                  </button>
-                  
-                  
-                  
+                      type="button"
+                      onClick={handleAnalyzeImages}
+                      className="relative bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded border transition duration-200 overflow-hidden"
+                    >
+                      <span className="absolute inset-0 pointer-events-none bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-40 rounded"></span>
+                      <span className="relative">Analyze Food</span>
+                    </button>
                   )}
                 </div>
 
@@ -669,13 +701,12 @@ export default function RestaurantHome() {
                   </div>
                 )}
 
-{foodInspection && !inspectionLoading && (
-  <div className="mt-4 p-4 bg-gray-700 rounded border border-blue-500">
-    <h3 className="font-semibold text-white text-sm mb-2">Food Safety Analysis:</h3>
-    <Typewriter text={foodInspection} speed={20} />
-  </div>
-)}
-
+                {foodInspection && !inspectionLoading && (
+                  <div className="mt-4 p-4 bg-gray-700 rounded border border-blue-500">
+                    <h3 className="font-semibold text-white text-sm mb-2">Food Safety Analysis:</h3>
+                    <Typewriter text={foodInspection} speed={20} />
+                  </div>
+                )}
               </div>
 
               <button
@@ -698,37 +729,13 @@ export default function RestaurantHome() {
                 <p className="text-gray-400">No active deals. Create your first deal now!</p>
               ) : (
                 deals.map((deal) => (
-                  <div key={deal.id} className="bg-gray-700 p-4 rounded border border-gray-600 relative">
-                    {/* Delete button */}
-                    <button
-                      onClick={() => handleDeleteDeal(deal.id)}
-                      disabled={isDeleting}
-                      className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-full h-6 w-6 flex items-center justify-center"
-                      title="Delete Deal"
-                    >
-                      ×
-                    </button>
-                    
-                    <h3 className="text-white font-semibold pr-6">{deal.title}</h3>
-                    {deal.description && <p className="text-gray-300 mt-1">{deal.description}</p>}
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <span className="text-sm text-gray-400">Qty: {deal.quantity}</span>
-                      <span className="text-sm text-gray-400">
-                        Original: ${parseFloat(deal.original_price).toFixed(2)}
-                      </span>
-                      <span className="text-sm text-gray-400">
-                        Current: ${parseFloat(deal.updated_price || deal.updated_price || 0).toFixed(2)}
-                      </span>
-                      <span className="text-sm text-gray-400">
-                        {formatLocalTime(deal.pickup_start)} - {formatLocalTime(deal.pickup_end)}
-                      </span>
-                    </div>
-                    <div className="mt-2">
-                      <span className={`text-sm px-2 py-1 rounded ${deal.claimed ? "bg-green-900 text-green-300" : "bg-blue-900 text-blue-300"}`}>
-                        {deal.claimed ? "Claimed" : "Available"}
-                      </span>
-                    </div>
-                  </div>
+                  <DealItem
+                    key={deal.id}
+                    deal={deal}
+                    handleDeleteDeal={handleDeleteDeal}
+                    isDeleting={isDeleting}
+                    formatLocalTime={formatLocalTime}
+                  />
                 ))
               )}
             </div>

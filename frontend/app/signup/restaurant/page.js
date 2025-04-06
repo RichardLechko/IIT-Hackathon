@@ -1,10 +1,127 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, memo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth, USER_TYPES } from "@/context/authContext";
-import { supabase } from "@/lib/supabase";
-import bcrypt from 'bcryptjs';
+import { getSupabase } from "@/lib/supabase";
+
+// Memoized form components for better performance
+const FormInput = memo(({ id, name, type, required, value, onChange, placeholder, label, disabled = false, maxLength, pattern, title }) => {
+  const inputClass = "mt-1 block w-full bg-gray-800 border border-gray-700 rounded py-2 px-3 text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500";
+  const labelClass = "block text-sm font-medium text-gray-300";
+  
+  return (
+    <div>
+      <label htmlFor={id} className={labelClass}>
+        {label}
+      </label>
+      <input
+        id={id}
+        name={name}
+        type={type}
+        required={required}
+        className={inputClass}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        disabled={disabled}
+        maxLength={maxLength}
+        pattern={pattern}
+        title={title}
+      />
+      {id === 'password' && (
+        <p className="mt-1 text-xs text-gray-400">
+          Minimum 8 characters
+        </p>
+      )}
+    </div>
+  );
+});
+
+FormInput.displayName = "FormInput";
+
+// Error message component
+const ErrorMessage = memo(({ message }) => {
+  if (!message) return null;
+  
+  return (
+    <div className="mb-4 p-3 bg-red-900/30 border border-red-800 rounded text-red-200 text-sm">
+      {message}
+    </div>
+  );
+});
+
+ErrorMessage.displayName = "ErrorMessage";
+
+// Location status component
+const LocationStatus = memo(({ status }) => {
+  if (!status) return null;
+  
+  const isError = status.includes("error") || status.includes("denied");
+  const textColor = isError ? "text-red-400" : "text-blue-400";
+  
+  return (
+    <p className={`mt-1 text-xs ${textColor}`}>
+      {status}
+    </p>
+  );
+});
+
+LocationStatus.displayName = "LocationStatus";
+
+// Loading indicator component
+const LoadingIndicator = memo(() => (
+  <div className="flex justify-center my-2">
+    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-500"></div>
+  </div>
+));
+
+LoadingIndicator.displayName = "LoadingIndicator";
+
+// Geocoding service with caching - lazy initialized
+let geocodeServiceInstance = null;
+const getGeocodeService = () => {
+  if (!geocodeServiceInstance) {
+    geocodeServiceInstance = {
+      cache: new Map(),
+      
+      async reverseGeocode(lat, lng) {
+        const cacheKey = `${lat},${lng}`;
+        
+        // Check cache first
+        if (this.cache.has(cacheKey)) {
+          return this.cache.get(cacheKey);
+        }
+        
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+            { 
+              headers: { 'Accept-Language': 'en' },
+              cache: 'force-cache'
+            }
+          );
+          
+          if (!response.ok) {
+            throw new Error(`Geocoding failed with status: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          const address = data?.display_name || '';
+          
+          // Cache the result
+          this.cache.set(cacheKey, address);
+          
+          return address;
+        } catch (error) {
+          console.error("Geocoding error:", error);
+          return '';
+        }
+      }
+    };
+  }
+  return geocodeServiceInstance;
+};
 
 export default function RestaurantSignup() {
   const { login } = useAuth();
@@ -20,94 +137,149 @@ export default function RestaurantSignup() {
   });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [hashingPassword, setHashingPassword] = useState(false);
   const [useCurrentLocation, setUseCurrentLocation] = useState(false);
   const [coordinates, setCoordinates] = useState({ lat: null, lng: null });
   const [locationStatus, setLocationStatus] = useState("");
+  const [isMounted, setIsMounted] = useState(false);
 
-  const handleChange = (e) => {
+  // Improved location handling
+  useEffect(() => {
+    setIsMounted(true);
+    
+    // Clean up function to clear geolocation timeout
+    return () => {
+      if (window.geoTimeoutId) {
+        clearTimeout(window.geoTimeoutId);
+      }
+    };
+  }, []);
+
+
+  const handleChange = useCallback((e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
-  };
+  }, []);
 
-  // Handle location checkbox change
-  const handleLocationCheckbox = (e) => {
+  const handleLocationCheckbox = useCallback((e) => {
     const isChecked = e.target.checked;
     setUseCurrentLocation(isChecked);
     
     if (isChecked) {
-      getCurrentLocation();
+      // Wrap in a check to ensure we're in a browser environment
+      if (typeof window !== 'undefined' && window.navigator.geolocation) {
+        getCurrentLocation();
+      } else {
+        setLocationStatus("Geolocation is not supported");
+        setUseCurrentLocation(false);
+      }
     } else {
-      // Clear the address field if user unchecks the box
+      // Clear location-related states when unchecked
       setFormData(prev => ({ ...prev, address: "" }));
       setCoordinates({ lat: null, lng: null });
       setLocationStatus("");
     }
-  };
+  }, []);
 
-  // Get current location
-  const getCurrentLocation = () => {
-    setLocationStatus("Requesting location...");
-    
-    if (!navigator.geolocation) {
+  const getCurrentLocation = useCallback(() => {
+    // Ensure we're in a browser environment and geolocation is supported
+    if (typeof window === 'undefined' || !window.navigator.geolocation) {
       setLocationStatus("Geolocation is not supported by your browser");
+      setUseCurrentLocation(false);
       return;
     }
+    
+    setLocationStatus("Requesting location...");
+    
+    // Clear any existing geolocation timeouts
+    if (window.geoTimeoutId) {
+      clearTimeout(window.geoTimeoutId);
+    }
+
+    // More robust geolocation options
+    const options = {
+      enableHighAccuracy: true, 
+      timeout: 40000,  // 10 seconds
+      maximumAge: 50000 // 30 seconds
+    };
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
         setCoordinates({ lat: latitude, lng: longitude });
         
-        // Attempt to reverse geocode to get address
         try {
-          // This is a simple example using a free geocoding API
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
-          );
-          const data = await response.json();
+          setLocationStatus("Finding address...");
+          const geocodeService = getGeocodeService();
+          const address = await geocodeService.reverseGeocode(latitude, longitude);
           
-          if (data && data.display_name) {
-            setFormData(prev => ({ ...prev, address: data.display_name }));
-            setLocationStatus("Location found");
+          if (address) {
+            setFormData(prev => ({ ...prev, address }));
+            setLocationStatus("Location found successfully");
           } else {
-            setLocationStatus("Location found, but couldn't get address");
+            setLocationStatus("Location found, but couldn't get precise address");
           }
         } catch (error) {
-          console.error("Error getting address:", error);
+          console.error("Geocoding error:", error);
           setLocationStatus("Location coordinates captured (address lookup failed)");
-          // Just use the coordinates without address
         }
       },
       (error) => {
-        console.error("Error getting location:", error);
-        setLocationStatus(
-          error.code === 1
-            ? "Location permission denied"
-            : "Error getting location"
-        );
+        console.error("Geolocation error:", error);
+        let errorMessage = "Error getting location";
+        
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = "Location permission denied. Please enable location or enter address manually.";
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = "Location information is unavailable.";
+            break;
+          case error.TIMEOUT:
+            errorMessage = "Location request timed out. Please try again.";
+            break;
+        }
+        
+        setLocationStatus(errorMessage);
         setUseCurrentLocation(false);
+        setCoordinates({ lat: null, lng: null });
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      options
     );
-  };
 
-  // Validation functions
-  const validateEmail = (email) => {
+    // Backup timeout
+    window.geoTimeoutId = setTimeout(() => {
+      setLocationStatus("Location request timed out. Please try again or enter address manually.");
+      setUseCurrentLocation(false);
+    }, 15000);
+  }, []);
+
+  // Clean up geolocation timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (window.geoTimeoutId) {
+        clearTimeout(window.geoTimeoutId);
+      }
+    };
+  }, []);
+
+  // Validation functions - memoized for performance
+  const validateEmail = useCallback((email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
-  };
+  }, []);
 
-  const validatePassword = (password) => {
+  const validatePassword = useCallback((password) => {
     return password.length >= 8;
-  };
+  }, []);
 
-  const validatePhoneNumber = (phone) => {
+  const validatePhoneNumber = useCallback((phone) => {
     const phoneRegex = /^\(?\d{3}\)?[-. ]?\d{3}[-. ]?\d{4}$/;
     return phoneRegex.test(phone);
-  };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -147,32 +319,50 @@ export default function RestaurantSignup() {
     }
     
     try {
-      // Hash the password
-      const salt = await bcrypt.genSalt(10);
+      const supabase = getSupabase();
+      
+      // Check if email already exists
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', formData.email.trim().toLowerCase())
+        .single();
+      
+      if (existingUser) {
+        setError("This email is already registered. Please use a different email or log in.");
+        setIsLoading(false);
+        return;
+      }
+      
+      // Load bcrypt dynamically to prevent initial page load delay
+      setHashingPassword(true);
+      // Dynamic import of bcrypt for better initial page load time
+      const bcryptModule = await import('bcryptjs');
+      const bcrypt = bcryptModule.default;
+      
+      // Hash the password with optimal security settings
+      const salt = await bcrypt.genSalt(12);
       const hashedPassword = await bcrypt.hash(formData.password, salt);
+      setHashingPassword(false);
       
       // Insert user data into Supabase
       const { data, error } = await supabase
-        .from('users')
+        .from("users")
         .insert([
-          { 
+          {
             name: formData.name.trim(),
             email: formData.email.trim().toLowerCase(),
             password_hash: hashedPassword,
             phone_number: formData.phoneNumber.trim(),
             is_restaurant: true,
-            lat: coordinates.lat, 
+            lat: coordinates.lat,
             lng: coordinates.lng,
-            created_at: new Date().toISOString()
-          }
+            created_at: new Date().toISOString(),
+          },
         ])
         .select();
       
       if (error) {
-        // Check for duplicate email error
-        if (error.code === '23505') {
-          throw new Error("This email is already registered. Please use a different email or log in.");
-        }
         throw error;
       }
       
@@ -185,7 +375,7 @@ export default function RestaurantSignup() {
           businessName: formData.businessName
         }, USER_TYPES.BUSINESS);
         
-        // Redirect to home page
+        // Redirect to restaurant dashboard
         router.push('/');
       }
     } catch (err) {
@@ -195,10 +385,6 @@ export default function RestaurantSignup() {
       setIsLoading(false);
     }
   };
-
-  const inputClass =
-    "mt-1 block w-full bg-gray-800 border border-gray-700 rounded py-2 px-3 text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500";
-  const labelClass = "block text-sm font-medium text-gray-300";
 
   return (
     <div className="min-h-screen bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
@@ -217,50 +403,36 @@ export default function RestaurantSignup() {
             </p>
           </div>
 
-          {error && (
-            <div className="mb-4 p-3 bg-red-900/30 border border-red-800 rounded text-red-200 text-sm">
-              {error}
-            </div>
-          )}
+          <ErrorMessage message={error} />
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="name" className={labelClass}>
-                Business Name
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                required
-                className={inputClass}
-                value={formData.name}
-                onChange={handleChange}
-                placeholder="Your Restaurant Name"
-                maxLength={100}
-              />
-            </div>
+            <FormInput
+              id="name"
+              name="name"
+              type="text"
+              required={true}
+              value={formData.name}
+              onChange={handleChange}
+              placeholder="Your Restaurant Name"
+              label="Business Name"
+              maxLength={100}
+            />
+
+            <FormInput
+              id="email"
+              name="email"
+              type="email"
+              required={true}
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="you@example.com"
+              label="Email Address"
+              pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
+              title="Please enter a valid email address"
+            />
 
             <div>
-              <label htmlFor="email" className={labelClass}>
-                Email Address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                className={inputClass}
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="you@example.com"
-                pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
-                title="Please enter a valid email address"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="address" className={labelClass}>
+              <label htmlFor="address" className="block text-sm font-medium text-gray-300">
                 Business Address
               </label>
               <input
@@ -268,91 +440,67 @@ export default function RestaurantSignup() {
                 name="address"
                 type="text"
                 required
-                className={inputClass}
+                className="mt-1 block w-full bg-gray-800 border border-gray-700 rounded py-2 px-3 text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                 value={formData.address}
                 onChange={handleChange}
                 placeholder="123 Main St, Chicago, IL"
                 disabled={useCurrentLocation}
                 maxLength={200}
               />
-              <div className="mt-2 flex items-center">
-                <input
-                  id="useCurrentLocation"
-                  name="useCurrentLocation"
-                  type="checkbox"
-                  checked={useCurrentLocation}
-                  onChange={handleLocationCheckbox}
-                  className="h-4 w-4 bg-gray-800 border-gray-700 text-blue-600 focus:ring-blue-500 rounded"
-                />
-                <label htmlFor="useCurrentLocation" className="ml-2 text-sm text-gray-400">
-                  Use current location
-                </label>
-              </div>
-              {locationStatus && (
-                <p className={`mt-1 text-xs ${
-                  locationStatus.includes("error") || locationStatus.includes("denied") 
-                    ? "text-red-400" 
-                    : "text-blue-400"
-                }`}>
-                  {locationStatus}
-                </p>
+              {isMounted && (
+                <div className="mt-2 flex items-center">
+                  <input
+                    id="useCurrentLocation"
+                    name="useCurrentLocation"
+                    type="checkbox"
+                    checked={useCurrentLocation}
+                    onChange={handleLocationCheckbox}
+                    className="h-4 w-4 bg-gray-800 border-gray-700 text-blue-600 focus:ring-blue-500 rounded"
+                  />
+                  <label htmlFor="useCurrentLocation" className="ml-2 text-sm text-gray-400">
+                    Use current location
+                  </label>
+                </div>
               )}
+              <LocationStatus status={locationStatus} />
             </div>
 
-            <div>
-              <label htmlFor="phoneNumber" className={labelClass}>
-                Phone Number
-              </label>
-              <input
-                id="phoneNumber"
-                name="phoneNumber"
-                type="tel"
-                required
-                className={inputClass}
-                value={formData.phoneNumber}
-                onChange={handleChange}
-                placeholder="(312) 555-1234"
-                pattern="\(?\d{3}\)?[-. ]?\d{3}[-. ]?\d{4}"
-                title="Please enter a valid phone number"
-              />
-            </div>
+            <FormInput
+              id="phoneNumber"
+              name="phoneNumber"
+              type="tel"
+              required={true}
+              value={formData.phoneNumber}
+              onChange={handleChange}
+              placeholder="(312) 555-1234"
+              label="Phone Number"
+              pattern="\(?\d{3}\)?[-. ]?\d{3}[-. ]?\d{4}"
+              title="Please enter a valid phone number"
+            />
 
-            <div>
-              <label htmlFor="password" className={labelClass}>
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                className={inputClass}
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="••••••••"
-                minLength={8}
-                title="Password must be at least 8 characters long"
-              />
-              <p className="mt-1 text-xs text-gray-400">
-                Minimum 8 characters
-              </p>
-            </div>
+            <FormInput
+              id="password"
+              name="password"
+              type="password"
+              required={true}
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="••••••••"
+              label="Password"
+              minLength={8}
+              title="Password must be at least 8 characters long"
+            />
 
-            <div>
-              <label htmlFor="confirmPassword" className={labelClass}>
-                Confirm Password
-              </label>
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                required
-                className={inputClass}
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                placeholder="••••••••"
-              />
-            </div>
+            <FormInput
+              id="confirmPassword"
+              name="confirmPassword"
+              type="password"
+              required={true}
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              placeholder="••••••••"
+              label="Confirm Password"
+            />
 
             <div className="flex items-center justify-between pt-4">
               <Link
@@ -363,10 +511,19 @@ export default function RestaurantSignup() {
               </Link>
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || hashingPassword}
                 className="bg-blue-600 text-white py-2 px-6 border border-blue-500 rounded text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? "Creating Account..." : "Create Account"}
+                {isLoading || hashingPassword ? (
+                  <span className="flex items-center">
+                    <span className="mr-2">
+                      {hashingPassword ? "Securing Password..." : "Creating Account..."}
+                    </span>
+                    <LoadingIndicator />
+                  </span>
+                ) : (
+                  "Create Account"
+                )}
               </button>
             </div>
           </form>

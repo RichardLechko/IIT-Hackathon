@@ -104,3 +104,130 @@ body {
 a {
   cursor: pointer;
 }
+
+@media (max-width: 1024px) {
+  /* All sections - consistent padding and layout */
+  #hero-section,
+  #feature-highlights,
+  #how-it-works,
+  #for-businesses,
+  #for-shelters,
+  #cta-section {
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
+  }
+  
+  /* Convert all flex sections to vertical stacking */
+  #hero-section .flex,
+  #for-businesses .flex,
+  #for-shelters .flex {
+    flex-direction: column !important;
+    align-items: center !important;
+  }
+  
+  /* Make all half-width sections full width */
+  #hero-section .w-1/2,
+  #for-businesses .w-1/2,
+  #for-shelters .w-1/2 {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-bottom: 2.5rem !important;
+  }
+  
+  /* Center all hero section text */
+  #hero-section .text-5xl,
+  #hero-section .text-3xl,
+  #hero-section .text-xl,
+  #hero-section .mb-8,
+  #hero-section .w-20 {
+    text-align: center !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+  
+  /* All grid sections to single column */
+  #feature-highlights .grid-cols-3,
+  #how-it-works .grid-cols-3 {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+  }
+  
+  /* CTA section button stacking */
+  #cta-section .space-x-4 > *,
+  #hero-section .space-x-4 > * {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    margin-bottom: 1rem !important;
+  }
+  
+  #cta-section .flex {
+    flex-direction: column !important;
+  }
+
+  #hero-section .space-x-4 > * {
+    text-align: center;
+    width: 300px;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Uniform padding for all sections */
+  #hero-section,
+  #feature-highlights,
+  #how-it-works,
+  #for-businesses,
+  #for-shelters,
+  #cta-section {
+    padding-top: 2.5rem !important;
+    padding-bottom: 2.5rem !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+  
+  /* Uniform text sizes */
+  #hero-section .text-5xl {
+    font-size: 2.25rem !important;
+  }
+  
+  #hero-section .text-3xl,
+  #feature-highlights .text-3xl,
+  #how-it-works .text-3xl,
+  #for-businesses .text-3xl,
+  #for-shelters .text-3xl,
+  #cta-section .text-3xl {
+    font-size: 1.75rem !important;
+  }
+  
+  /* Hero section CTA buttons */
+  #hero-section .flex.space-x-4 {
+    flex-direction: column !important;
+    width: 100% !important;
+  }
+  
+  #hero-section .flex.space-x-4 > a {
+    width: 100% !important;
+    margin: 0 0 1rem 0 !important;
+    text-align: center !important;
+  }
+  
+  /* Uniform container sizes for images */
+  #hero-section .h-96,
+  #for-businesses .h-80,
+  #for-shelters .h-80 {
+    height: 12rem !important;
+    width: 100% !important;
+  }
+  
+  /* Single column for all grids */
+  #for-shelters .grid-cols-2 {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+  }
+  
+  /* Business section adjustments */
+  #for-businesses .p-8 {
+    padding: 1.25rem !important;
+  }
+  
+  #for-businesses .space-y-6 > li {
+    align-items: flex-start !important;
+  }
+}

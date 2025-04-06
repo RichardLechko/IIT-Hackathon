@@ -115,12 +115,9 @@ export default function Login() {
         userType
       );
 
-      // Redirect to appropriate dashboard based on user type
-      if (data.is_restaurant) {
-        router.push("/dashboard");
-      } else {
-        router.push("/");
-      }
+     
+      router.push("/");
+      
     } catch (err) {
       console.error("Error during login:", err);
       setError("An error occurred during login. Please try again.");

@@ -35,7 +35,6 @@ export default function Home() {
             <div className="w-1/2 flex justify-center">
               <div className="w-full max-w-md h-96 bg-gray-700 rounded border-2 border-gray-600 overflow-hidden">
                 <div className="w-full h-full flex items-center justify-center">
-                  <p className="text-gray-400 font-medium">App Screenshot</p>
                 </div>
               </div>
             </div>
@@ -306,9 +305,7 @@ export default function Home() {
             <div className="w-1/2 flex justify-center">
               <div className="w-full max-w-md h-80 bg-gray-800 rounded border-2 border-gray-700 overflow-hidden">
                 <div className="w-full h-full flex items-center justify-center">
-                  <p className="text-gray-400 font-medium">
-                    Business Dashboard Preview
-                  </p>
+                  
                 </div>
               </div>
             </div>
